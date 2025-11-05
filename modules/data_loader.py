@@ -20,6 +20,23 @@ DB_CONFIG = {
 }
 
 
+
+POSTMAN_BODY_TEMPLATE = None
+POSTMAN_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), '..', 'Proyecto de grado.postman_collection.json')
+RMCAB_ENDPOINT = os.getenv('RMCAB_ENDPOINT', 'http://rmcab.ambientebogota.gov.co/home/MonitorsVal')
+RMCAB_HEADERS = {
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    'Accept': 'application/json',
+    'User-Agent': 'Mozilla/5.0'
+}
+RMCAB_STATION_INFO = {
+    6: {
+        'name': 'Las Ferias',
+        'short_name': 'Ferias'
+    }
+}
+
+
 def load_lowcost_data(start_date='2024-06-01', end_date='2024-07-31', devices=None):
     """
     Carga datos de sensores de bajo costo desde PostgreSQL
@@ -90,12 +107,111 @@ def load_lowcost_data(start_date='2024-06-01', end_date='2024-07-31', devices=No
         return None
 
 
+
+def _load_postman_body_template():
+    global POSTMAN_BODY_TEMPLATE
+
+    if POSTMAN_BODY_TEMPLATE:
+        return POSTMAN_BODY_TEMPLATE
+
+    if not os.path.exists(POSTMAN_TEMPLATE_PATH):
+        print(f"Archivo Postman no encontrado: {POSTMAN_TEMPLATE_PATH}")
+        return None
+
+    try:
+        with open(POSTMAN_TEMPLATE_PATH, 'r', encoding='utf-8') as template_file:
+            postman_data = json.load(template_file)
+            POSTMAN_BODY_TEMPLATE = postman_data['item'][0]['request']['body']['raw']
+    except (KeyError, IndexError, json.JSONDecodeError) as exc:
+        print(f"No se pudo cargar el template de Postman: {exc}")
+        return None
+
+    return POSTMAN_BODY_TEMPLATE
+
+
+def _build_rmcab_request_body(template, station_code, station_name, pollutant_channel, user_date, days):
+    safe_name = station_name.replace(' ', '+')
+    short_name = RMCAB_STATION_INFO.get(station_code, {}).get('short_name', station_name.split(' ')[0])
+    safe_short = short_name.replace(' ', '+')
+
+    body = template
+    replacements = {
+        '%22serialCode%22%3A6': f"%22serialCode%22%3A{station_code}",
+        'serialCode%22%3A6': f"serialCode%22%3A{station_code}",
+        'Las+Ferias': safe_name,
+        '%22name%22%3A%22Las+Ferias%22': f"%22name%22%3A%22{safe_name}%22",
+        '%22StationTag%22%3A%226%22': f"%22StationTag%22%3A%22{station_code}%22",
+        'StationTag%22%3A%226': f"StationTag%22%3A%22{station_code}",
+        '%22ShortName%22%3A%22Ferias%22': f"%22ShortName%22%3A%22{safe_short}%22",
+        'SelectedPollutant=S_6_1': f"SelectedPollutant=S_{station_code}_{pollutant_channel}",
+        'UserDate=2025%2F07%2F30': f"UserDate={user_date.replace('/', '%2F')}",
+        'days=15': f"days={days}"
+    }
+
+    for old, new in replacements.items():
+        body = body.replace(old, new)
+
+    return body
+
+
+def _fetch_rmcab_pollutant_series(template, station_code, station_name, pollutant_channel, user_date, days):
+    body = _build_rmcab_request_body(template, station_code, station_name, pollutant_channel, user_date, days)
+
+    try:
+        response = requests.post(RMCAB_ENDPOINT, data=body, headers=RMCAB_HEADERS, timeout=60)
+    except requests.RequestException as exc:
+        print(f"Error de red solicitando RMCAB ({station_code}-{pollutant_channel}): {exc}")
+        return pd.DataFrame()
+
+    if response.status_code != 200:
+        print(f"Respuesta no exitosa de RMCAB ({station_code}-{pollutant_channel}): {response.status_code}")
+        return pd.DataFrame()
+
+    try:
+        payload = response.json()
+    except json.JSONDecodeError as exc:
+        print(f"Error interpretando respuesta de RMCAB ({station_code}-{pollutant_channel}): {exc}")
+        return pd.DataFrame()
+
+    if 'ListDic' not in payload or not payload['ListDic']:
+        return pd.DataFrame()
+
+    series_info = payload.get('series', [])
+    pollutant_field = f"S_{station_code}_{pollutant_channel}"
+    pollutant_label = next((serie.get('name') for serie in series_info if serie.get('field') == pollutant_field), None)
+
+    if not pollutant_label:
+        pollutant_label = 'PM10' if pollutant_channel == 1 else 'PM2.5'
+
+    records = []
+
+    for entry in payload['ListDic']:
+        datetime_str = entry.get('datetime')
+        value_str = entry.get(pollutant_field)
+
+        if not datetime_str or value_str is None:
+            continue
+
+        try:
+            value = float(str(value_str).replace(',', '.'))
+            timestamp = datetime.strptime(datetime_str, '%d-%m-%Y %H:%M')
+            records.append({
+                'datetime': timestamp,
+                'station': station_name,
+                'pollutant': pollutant_label,
+                'value': value
+            })
+        except (ValueError, TypeError):
+            continue
+
+    return pd.DataFrame(records)
+
 def load_rmcab_data(station_code=6, start_date='2024-06-01', end_date='2024-07-31'):
     """
     Carga datos de RMCAB desde la API
 
     Args:
-        station_code: Código de estación RMCAB (default: 6 = Las Ferias)
+        station_code: Codigo de estacion RMCAB (default: 6 = Las Ferias)
         start_date: Fecha inicial (formato YYYY-MM-DD)
         end_date: Fecha final (formato YYYY-MM-DD)
 
@@ -103,70 +219,70 @@ def load_rmcab_data(station_code=6, start_date='2024-06-01', end_date='2024-07-3
         DataFrame con columnas: datetime, station, pm25, pm10
     """
     try:
-        # Cargar template de Postman
-        postman_file = os.path.join(os.path.dirname(__file__), '..', 'Proyecto de grado.postman_collection.json')
-
-        if not os.path.exists(postman_file):
-            print(f"Archivo Postman no encontrado: {postman_file}")
+        template = _load_postman_body_template()
+        if not template:
             return None
 
-        with open(postman_file, 'r', encoding='utf-8') as f:
-            postman_data = json.load(f)
+        station_meta = RMCAB_STATION_INFO.get(station_code, {})
+        station_name = station_meta.get('name', f'Estacion {station_code}')
 
-        # Extraer URL y headers del template
-        request_item = postman_data['item'][0]['request']
-        url_template = request_item['url']['raw']
-
-        # Configurar parámetros
         start = datetime.strptime(start_date, '%Y-%m-%d')
         end = datetime.strptime(end_date, '%Y-%m-%d')
-        days = (end - start).days
 
-        # Construir URLs para PM25 y PM10
-        urls = {
-            'pm25': url_template.replace('{{variable}}', '112').replace('{{station}}', str(station_code)),
-            'pm10': url_template.replace('{{variable}}', '114').replace('{{station}}', str(station_code))
-        }
+        if end <= start:
+            end = start + timedelta(days=1)
 
-        data_frames = []
+        days = max((end - start).days, 1)
+        user_date = end.strftime('%Y/%m/%d')
 
-        for pollutant, url in urls.items():
-            url = url.replace('{{days}}', str(days)).replace('{{date}}', end.strftime('%Y/%m/%d'))
+        datasets = []
+        for pollutant_channel in (1, 15):
+            df_pollutant = _fetch_rmcab_pollutant_series(
+                template,
+                station_code,
+                station_name,
+                pollutant_channel,
+                user_date,
+                days
+            )
+            if df_pollutant is not None and not df_pollutant.empty:
+                datasets.append(df_pollutant)
 
-            response = requests.get(url, timeout=60)
-
-            if response.status_code == 200:
-                data = response.json()
-
-                if 'data' in data and len(data['data']) > 0:
-                    df = pd.DataFrame(data['data'])
-                    df['pollutant'] = pollutant
-                    df['datetime'] = pd.to_datetime(df['datetime'])
-                    df['value'] = pd.to_numeric(df['value'], errors='coerce')
-                    data_frames.append(df)
-
-        if data_frames:
-            # Combinar PM25 y PM10
-            df_combined = pd.concat(data_frames)
-
-            # Pivot para tener PM25 y PM10 como columnas
-            df_pivot = df_combined.pivot_table(
-                index='datetime',
-                columns='pollutant',
-                values='value',
-                aggfunc='first'
-            ).reset_index()
-
-            df_pivot = df_pivot.rename(columns={'pm25': 'pm25', 'pm10': 'pm10'})
-            df_pivot['station'] = f'RMCAB_{station_code}'
-
-            return df_pivot
-        else:
-            print("No se pudieron obtener datos de RMCAB")
+        if not datasets:
+            print('No se pudieron obtener datos de RMCAB')
             return pd.DataFrame()
 
-    except Exception as e:
-        print(f"Error cargando datos de RMCAB: {e}")
+        combined = pd.concat(datasets, ignore_index=True)
+
+        pivot = combined.pivot_table(
+            index='datetime',
+            columns='pollutant',
+            values='value',
+            aggfunc='first'
+        ).reset_index()
+
+        column_mapping = {}
+        for col in pivot.columns:
+            if isinstance(col, str):
+                normalized = col.lower().replace(' ', '').replace('.', '')
+                if normalized == 'pm25':
+                    column_mapping[col] = 'pm25'
+                elif normalized == 'pm10':
+                    column_mapping[col] = 'pm10'
+
+        if column_mapping:
+            pivot = pivot.rename(columns=column_mapping)
+
+        if 'pm25' not in pivot.columns:
+            pivot['pm25'] = None
+        if 'pm10' not in pivot.columns:
+            pivot['pm10'] = None
+
+        pivot['station'] = f'RMCAB_{station_code}'
+
+        return pivot.sort_values('datetime')
+    except Exception as exc:
+        print(f"Error cargando datos de RMCAB: {exc}")
         return None
 
 

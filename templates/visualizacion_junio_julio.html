@@ -4,19 +4,6 @@
 
 {% block extra_css %}
 <style>
-    .device-card {
-        cursor: pointer;
-        transition: all 0.3s ease;
-        border: 2px solid transparent;
-    }
-    .device-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-    }
-    .device-card.selected {
-        border-color: var(--primary-green);
-        background-color: #f0fdf4;
-    }
     .plot-container {
         background: white;
         border-radius: 1rem;
@@ -51,6 +38,22 @@
         border-radius: 0.5rem;
         text-align: center;
     }
+    .quick-selection {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    .quick-selection .btn {
+        min-width: 160px;
+        margin: 0.25rem;
+    }
+    .plot-container.small {
+        padding: 1rem 1.25rem;
+    }
+    .comparison-plot {
+        min-height: 320px;
+    }
 </style>
 {% endblock %}
 
@@ -84,54 +87,75 @@
             Paso 1: Selecciona un Dispositivo
         </h3>
 
-        <div class="row g-3" id="deviceSelector">
-            <!-- Sensores de Bajo Costo -->
-            <div class="col-md-4">
-                <div class="card device-card h-100" data-device="Aire2" data-type="sensor">
-                    <div class="card-body text-center p-4">
-                        <i class="bi bi-cpu display-3 text-primary mb-3"></i>
-                        <h5 class="card-title">Sensor Aire2</h5>
-                        <p class="text-muted small">Sensor de Bajo Costo<br>PMS5003</p>
-                    </div>
-                </div>
+        <div class="quick-selection">
+            <div class="btn-group flex-wrap justify-content-center" role="group" id="quickViewButtons">
+                <button type="button" class="btn btn-outline-success quick-view-btn" data-device="Aire2" data-type="sensor">
+                    <i class="bi bi-cpu"></i> Aire2
+                </button>
+                <button type="button" class="btn btn-outline-success quick-view-btn" data-device="Aire4" data-type="sensor">
+                    <i class="bi bi-cpu"></i> Aire4
+                </button>
+                <button type="button" class="btn btn-outline-success quick-view-btn" data-device="Aire5" data-type="sensor">
+                    <i class="bi bi-cpu"></i> Aire5
+                </button>
+                <button type="button" class="btn btn-outline-warning quick-view-btn" data-device="RMCAB_LasFer" data-type="rmcab">
+                    <i class="bi bi-building"></i> RMCAB Las Ferias
+                </button>
+                <button type="button" class="btn btn-outline-secondary quick-view-btn" data-view="comparison">
+                    <i class="bi bi-grid-3x3-gap-fill"></i> Comparar 4 Sensores
+                </button>
             </div>
-
-            <div class="col-md-4">
-                <div class="card device-card h-100" data-device="Aire4" data-type="sensor">
-                    <div class="card-body text-center p-4">
-                        <i class="bi bi-cpu display-3 text-success mb-3"></i>
-                        <h5 class="card-title">Sensor Aire4</h5>
-                        <p class="text-muted small">Sensor de Bajo Costo<br>PMS5003</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card device-card h-100" data-device="Aire5" data-type="sensor">
-                    <div class="card-body text-center p-4">
-                        <i class="bi bi-cpu display-3 text-info mb-3"></i>
-                        <h5 class="card-title">Sensor Aire5</h5>
-                        <p class="text-muted small">Sensor de Bajo Costo<br>PMS5003</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Estaciones RMCAB - Solo Las Ferias para Jun-Jul 2025 -->
-            <div class="col-md-12">
-                <div class="card device-card h-100" data-device="RMCAB_LasFer" data-type="rmcab" data-station="6">
-                    <div class="card-body text-center p-4">
-                        <i class="bi bi-building display-3 text-warning mb-3"></i>
-                        <h5 class="card-title">RMCAB - Las Ferias</h5>
-                        <p class="text-muted small">Estación de Referencia<br>Código: 6 | Jun-Jul 2025</p>
-                    </div>
-                </div>
-            </div>
+            <small class="text-muted mt-2 text-center">
+                Usa los botones para cargar r&aacute;pidamente cada sensor o visualizar los cuatro al tiempo.
+            </small>
         </div>
-
-        <div class="text-center mt-4">
-            <button class="btn btn-primary-custom btn-lg" id="btnLoadDevice" disabled>
-                <i class="bi bi-download"></i> Cargar Datos del Dispositivo
+        <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
+            <button class="btn btn-outline-primary btn-sm" id="btnLoadDevice" disabled>
+                <i class="bi bi-arrow-clockwise"></i> Recargar &uacute;ltimo dispositivo
             </button>
+            <button class="btn btn-success btn-sm" id="btnStartCalibration">
+                <i class="bi bi-cpu-fill"></i> Ejecutar Calibraci&oacute;n ML
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Vista Comparativa de Sensores -->
+<section class="section bg-light" id="multiSensorSection" style="display: none;">
+    <div class="container">
+        <h3 class="mb-4">
+            <i class="bi bi-grid-1x2-fill"></i>
+            Paso 2: Comparativa de Sensores (Junio - Julio 2025)
+        </h3>
+        <p class="text-muted">
+            Observa simult&aacute;neamente los cuatro sensores para identificar patrones, brechas y coherencia frente a la estaci&oacute;n de referencia RMCAB.
+        </p>
+
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="plot-container small">
+                    <h5>Aire2 - Serie de Tiempo</h5>
+                    <div class="comparison-plot" id="comparisonPlotAire2"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="plot-container small">
+                    <h5>Aire4 - Serie de Tiempo</h5>
+                    <div class="comparison-plot" id="comparisonPlotAire4"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="plot-container small">
+                    <h5>Aire5 - Serie de Tiempo</h5>
+                    <div class="comparison-plot" id="comparisonPlotAire5"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="plot-container small">
+                    <h5>RMCAB Las Ferias</h5>
+                    <div class="comparison-plot" id="comparisonPlotRMCAB_LasFer"></div>
+                </div>
+            </div>
         </div>
     </div>
 </section>
@@ -167,91 +191,34 @@
                 </div>
             </div>
         </div>
-
-        <div class="text-center mt-4">
-            <button class="btn btn-secondary-custom btn-lg" id="btnStartCalibration">
-                <i class="bi bi-cpu-fill"></i> Iniciar Calibración con Modelos ML
-            </button>
-        </div>
     </div>
 </section>
 
 <!-- Resultados de Calibración -->
 <section class="section" id="calibrationSection" style="display: none;">
     <div class="container">
-        <h3 class="mb-4">
-            <i class="bi bi-bar-chart-line"></i>
-            Paso 3: Resultados de Calibración
-        </h3>
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+            <h3 class="mb-0">
+                <i class="bi bi-bar-chart-line"></i>
+                Paso 3: Calibración frente a RMCAB
+            </h3>
+            <div class="text-muted small" id="calibrationReferenceInfo"></div>
+        </div>
 
-        <!-- Resumen de Efectividad -->
         <div class="alert alert-info">
-            <h5>
+            <h5 class="mb-2">
                 <i class="bi bi-info-circle-fill"></i>
-                Interpretación de Resultados
+                Referencia
             </h5>
             <ul class="mb-0">
-                <li><strong>R²:</strong> Cercano a 1 es mejor (explica más varianza)</li>
-                <li><strong>RMSE y MAE:</strong> Más bajo es mejor (menor error)</li>
-                <li><strong>MAPE:</strong> Más bajo es mejor (menor error porcentual)</li>
+                <li>El referente es la estación oficial RMCAB (Las Ferias).</li>
+                <li><strong>R²</strong> cercano a 1 indica mejor ajuste; <strong>RMSE</strong> y <strong>MAE</strong> bajos implican menor error.</li>
+                <li>Se muestra la fórmula de la Regresión Lineal y la dispersión real vs. calibrado.</li>
             </ul>
         </div>
 
-        <!-- Tabla de Resultados -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Comparación de 5 Modelos de Calibración</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Modelo</th>
-                                <th>R²</th>
-                                <th>RMSE (µg/m³)</th>
-                                <th>MAE (µg/m³)</th>
-                                <th>MAPE (%)</th>
-                                <th>Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody id="calibrationResultsTable"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Gráfico Resumen de Efectividad -->
-        <div class="plot-container">
-            <h5>Resumen de Efectividad de Modelos</h5>
-            <div id="effectivenessPlot"></div>
-        </div>
-
-        <!-- Scatter Plots de cada Modelo -->
-        <h4 class="mt-5 mb-4">Diagramas de Dispersión por Modelo</h4>
-        <div class="row" id="scatterPlotsContainer"></div>
-
-        <!-- Mejor Modelo -->
-        <div class="alert alert-success mt-4" id="bestModelAlert"></div>
-    </div>
-</section>
-
-<!-- Comparación Antes/Después -->
-<section class="section bg-light" id="comparisonSection" style="display: none;">
-    <div class="container">
-        <h3 class="mb-4">
-            <i class="bi bi-arrow-left-right"></i>
-            Paso 4: Comparación Antes y Después de Calibración
-        </h3>
-
-        <div class="plot-container">
-            <div id="beforeAfterPlot"></div>
-        </div>
-
-        <div class="alert alert-success">
-            <h5><i class="bi bi-check-circle-fill"></i> Conclusión de Calibración</h5>
-            <p id="conclusionText"></p>
-        </div>
+        <ul class="nav nav-pills mb-3" id="calibrationTabs" role="tablist"></ul>
+        <div class="tab-content" id="calibrationTabContent"></div>
     </div>
 </section>
 {% endblock %}

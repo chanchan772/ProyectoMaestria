@@ -16,10 +16,16 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Importar módulos personalizados
-from modules.data_loader import load_lowcost_data, load_rmcab_data
-from modules.calibration import get_calibration_models, train_and_evaluate_models
+from modules.data_loader import load_lowcost_data, load_rmcab_data, RMCAB_STATION_INFO
+from modules.calibration import get_calibration_models, train_and_evaluate_models, run_device_calibration
 from modules.visualization import create_timeseries_plot, create_boxplot, create_heatmap
 from modules.metrics import calculate_statistics
+
+DEVICE_LABELS = {
+    'Aire2': 'Sensor Aire2',
+    'Aire4': 'Sensor Aire4',
+    'Aire5': 'Sensor Aire5'
+}
 
 # =======================
 # RUTAS PRINCIPALES
@@ -77,6 +83,65 @@ def api_load_lowcost():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/calibration-summary', methods=['POST'])
+def api_calibration_summary():
+    """Genera un resumen de calibración para todos los sensores solicitados"""
+    try:
+        payload = request.json or {}
+        start_date = payload.get('start_date', '2025-06-01')
+        end_date = payload.get('end_date', '2025-07-31')
+        devices = payload.get('devices') or ['Aire2', 'Aire4', 'Aire5']
+        pollutants = payload.get('pollutants') or ['pm25', 'pm10']
+        station_code = payload.get('station_code', 6)
+
+        lowcost_data = load_lowcost_data(start_date, end_date, devices)
+        rmcab_data = load_rmcab_data(station_code, start_date, end_date)
+
+        if (
+            lowcost_data is None or rmcab_data is None or
+            lowcost_data.empty or rmcab_data.empty
+        ):
+            return jsonify({
+                'success': False,
+                'error': 'No se pudieron cargar los datos necesarios para la calibración'
+            }), 400
+
+        sensor_summaries = []
+        for device in devices:
+            device_data = lowcost_data[lowcost_data['device_name'] == device].copy()
+
+            if device_data.empty:
+                sensor_summaries.append({
+                    'device': device,
+                    'label': DEVICE_LABELS.get(device, device),
+                    'pollutant_results': [],
+                    'error': 'No hay datos disponibles para el periodo seleccionado'
+                })
+                continue
+
+            calibration = run_device_calibration(device_data, rmcab_data, device, tuple(pollutants))
+            calibration['label'] = DEVICE_LABELS.get(device, device)
+            sensor_summaries.append(calibration)
+
+        reference_info = RMCAB_STATION_INFO.get(station_code, {})
+
+        return jsonify({
+            'success': True,
+            'period': {
+                'start_date': start_date,
+                'end_date': end_date
+            },
+            'reference': {
+                'station_code': station_code,
+                'station_name': reference_info.get('name', f'RMCAB {station_code}')
+            },
+            'sensors': sensor_summaries
+        })
+
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+
 @app.route('/api/load-rmcab-data', methods=['POST'])
 def api_load_rmcab():
     """Carga datos de RMCAB desde la API"""
@@ -108,11 +173,16 @@ def api_calibrate():
             return jsonify({'error': 'No se pudieron cargar los datos'}), 404
 
         # Ejecutar calibración
-        results = train_and_evaluate_models(lowcost_data, rmcab_data)
+        calibration = train_and_evaluate_models(lowcost_data, rmcab_data)
+
+        if calibration.get('error'):
+            return jsonify({'success': False, 'error': calibration['error']}), 400
 
         return jsonify({
             'success': True,
-            'results': results
+            'records': calibration.get('records', 0),
+            'best_model': calibration.get('best_model'),
+            'results': calibration.get('results', [])
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -208,23 +278,38 @@ def api_calibrate_device():
         end_date = request.json.get('end_date', '2024-07-31')
         pollutant = request.json.get('pollutant', 'pm25')
 
-        # Cargar datos del dispositivo
-        lowcost_data = load_lowcost_data(start_date, end_date, [device_name])
+        if not device_name:
+            return jsonify({'error': 'Debe proporcionar el nombre del dispositivo'}), 400
 
-        # Cargar datos de RMCAB
+        lowcost_data = load_lowcost_data(start_date, end_date, [device_name])
         rmcab_data = load_rmcab_data(6, start_date, end_date)  # Las Ferias
 
-        if lowcost_data is None or rmcab_data is None:
+        if (
+            lowcost_data is None or rmcab_data is None or
+            lowcost_data.empty or rmcab_data.empty
+        ):
             return jsonify({'error': 'No se pudieron cargar los datos'}), 404
 
-        # Ejecutar calibración
-        results = train_and_evaluate_models(lowcost_data, rmcab_data, pollutant)
+        device_data = lowcost_data[lowcost_data['device_name'] == device_name].copy()
+        if device_data.empty:
+            return jsonify({'error': 'El dispositivo no tiene datos en el periodo indicado'}), 404
+
+        calibration = run_device_calibration(device_data, rmcab_data, device_name, (pollutant,))
+        pollutant_results = calibration.get('pollutant_results', [])
+        pollutant_entry = pollutant_results[0] if pollutant_results else None
+
+        if not pollutant_entry or pollutant_entry.get('error'):
+            message = pollutant_entry.get('error') if pollutant_entry else 'No se obtuvieron resultados de calibración'
+            return jsonify({'error': message}), 400
 
         return jsonify({
             'success': True,
             'device': device_name,
             'pollutant': pollutant,
-            'results': results
+            'records': pollutant_entry.get('records', 0),
+            'results': pollutant_entry.get('models', []),
+            'linear_regression': pollutant_entry.get('linear_regression'),
+            'scatter': pollutant_entry.get('scatter')
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

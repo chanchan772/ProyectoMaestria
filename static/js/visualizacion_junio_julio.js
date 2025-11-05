@@ -6,24 +6,70 @@ let selectedDevice = null;
 let selectedDeviceType = null;
 let currentData = null;
 let calibrationResults = null;
+let activeViewMode = 'single';
+
+const DATE_RANGE = {
+    start: '2025-06-01',
+    end: '2025-07-31'
+};
+
+const DEVICE_CONFIG = {
+    Aire2: { type: 'sensor', label: 'Sensor Aire2' },
+    Aire4: { type: 'sensor', label: 'Sensor Aire4' },
+    Aire5: { type: 'sensor', label: 'Sensor Aire5' },
+    RMCAB_LasFer: { type: 'rmcab', label: 'RMCAB Las Ferias', station: 6 }
+};
+
+const DEVICE_ORDER = ['Aire2', 'Aire4', 'Aire5', 'RMCAB_LasFer'];
+const deviceDataCache = {};
+let currentFriendlyName = '';
+
+const SERIES_COLORS = {
+    pm25: '#006d77',
+    pm10: '#d62828'
+};
+
+const BOX_COLORS = {
+    pm25: '#83c5be',
+    pm10: '#ffb703'
+};
 
 // Elementos del DOM
-const deviceCards = document.querySelectorAll('.device-card');
 const btnLoadDevice = document.getElementById('btnLoadDevice');
 const btnStartCalibration = document.getElementById('btnStartCalibration');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const loadingMessage = document.getElementById('loadingMessage');
 const dataSection = document.getElementById('dataSection');
 const calibrationSection = document.getElementById('calibrationSection');
-const comparisonSection = document.getElementById('comparisonSection');
+const quickViewButtons = document.querySelectorAll('.quick-view-btn');
+const multiSensorSection = document.getElementById('multiSensorSection');
 
 // Event Listeners
-deviceCards.forEach(card => {
-    card.addEventListener('click', () => selectDevice(card));
-});
-
-btnLoadDevice.addEventListener('click', loadDeviceData);
+btnLoadDevice.addEventListener('click', () => loadDeviceData());
 btnStartCalibration.addEventListener('click', runCalibration);
+
+quickViewButtons.forEach(button => {
+    button.addEventListener('click', async () => {
+        try {
+            const isComparison = button.dataset.view === 'comparison';
+            if (isComparison) {
+                await showComparisonView();
+                setActiveQuickButton(button);
+                return;
+            }
+
+            const deviceName = button.dataset.device;
+            if (!deviceName) {
+                return;
+            }
+
+            await loadDeviceData(deviceName);
+            setActiveQuickButton(button);
+        } catch (error) {
+            console.error(error);
+        }
+    });
+});
 
 /**
  * Selecciona un dispositivo
@@ -42,86 +88,170 @@ function selectDevice(card) {
     btnLoadDevice.disabled = false;
 
     console.log('Dispositivo seleccionado:', selectedDevice, selectedDeviceType);
+    const quickButton = document.querySelector(`.quick-view-btn[data-device="${selectedDevice}"]`);
+    setActiveQuickButton(quickButton);
+}
+
+function selectDeviceByName(deviceName) {
+    if (!deviceName) {
+        return;
+    }
+
+    const config = DEVICE_CONFIG[deviceName] || {};
+
+    selectedDevice = deviceName;
+    if (config.type) {
+        selectedDeviceType = config.type;
+    }
+
+    btnLoadDevice.disabled = false;
+}
+
+function setActiveQuickButton(targetButton) {
+    quickViewButtons.forEach(btn => btn.classList.remove('active'));
+    if (targetButton) {
+        targetButton.classList.add('active');
+    }
+}
+
+function highlightQuickButtonForDevice(deviceName) {
+    if (!deviceName) {
+        return;
+    }
+
+    const button = document.querySelector(`.quick-view-btn[data-device="${deviceName}"]`);
+    setActiveQuickButton(button);
 }
 
 /**
  * Carga datos del dispositivo seleccionado
  */
-async function loadDeviceData() {
-    if (!selectedDevice) {
-        showAlert('Por favor selecciona un dispositivo primero', 'warning');
+
+
+async function loadDeviceData(deviceName = null) {
+    const targetDevice = deviceName || selectedDevice;
+
+    if (!targetDevice) {
+        showAlert("Por favor selecciona un dispositivo primero", "warning");
         return;
     }
 
-    showLoading(`Cargando datos de ${selectedDevice}...`);
+    const deviceConfig = DEVICE_CONFIG[targetDevice];
+
+    if (!deviceConfig) {
+        showAlert(`Dispositivo no configurado: ${targetDevice}`, "danger");
+        return;
+    }
+
+    selectDeviceByName(targetDevice);
+    highlightQuickButtonForDevice(targetDevice);
+
+    const friendlyName = deviceConfig.label || targetDevice;
+    showLoading(`Cargando datos de ${friendlyName}...`);
 
     try {
-        let response;
+        const result = await getDeviceData(targetDevice);
 
-        if (selectedDeviceType === 'sensor') {
-            // Cargar datos de sensor de bajo costo
-            response = await fetch('/api/load-device-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    device_name: selectedDevice,
-                    start_date: '2025-06-01',
-                    end_date: '2025-07-31'
-                })
-            });
-        } else {
-            // Cargar datos de RMCAB
-            const stationCode = document.querySelector(`.device-card[data-device="${selectedDevice}"]`).dataset.station;
-            response = await fetch('/api/load-rmcab-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    station_code: parseInt(stationCode),
-                    start_date: '2025-06-01',
-                    end_date: '2025-07-31'
-                })
-            });
-        }
+        currentData = result.data;
+        const recordCount = result.records ?? (Array.isArray(result.data) ? result.data.length : 0);
 
-        if (!response.ok) {
-            throw new Error('Error al cargar los datos');
-        }
+        showAlert(`Datos cargados: ${recordCount} registros`, "success");
 
-        const result = await response.json();
+        currentFriendlyName = friendlyName;
+        document.getElementById("selectedDeviceName").textContent = friendlyName;
+        showSingleSensorView();
 
-        if (result.success) {
-            currentData = result.data;
-            showAlert(`✓ Datos cargados: ${result.records} registros`, 'success');
+        await generateDataVisualizations(result.data, friendlyName);
 
-            // Mostrar sección de datos
-            document.getElementById('selectedDeviceName').textContent = selectedDevice;
-            dataSection.style.display = 'block';
-
-            // Scroll suave
-            dataSection.scrollIntoView({ behavior: 'smooth' });
-
-            // Generar visualizaciones
-            await generateDataVisualizations(result.data);
-        }
-
+        dataSection.scrollIntoView({ behavior: "smooth" });
     } catch (error) {
-        showAlert(`Error: ${error.message}`, 'danger');
+        showAlert(`Error: ${error.message}`, "danger");
         console.error(error);
     } finally {
         hideLoading();
+        btnStartCalibration.disabled = false;
     }
 }
+
+async function getDeviceData(deviceName, forceRefresh = false) {
+    if (!deviceName) {
+        throw new Error("Dispositivo no especificado");
+    }
+
+    if (!forceRefresh && deviceDataCache[deviceName]) {
+        return deviceDataCache[deviceName];
+    }
+
+    const config = DEVICE_CONFIG[deviceName];
+
+    if (!config) {
+        throw new Error(`Dispositivo no configurado: ${deviceName}`);
+    }
+
+    const payload = {
+        start_date: DATE_RANGE.start,
+        end_date: DATE_RANGE.end
+    };
+
+    let url = '';
+
+    if (config.type === 'sensor') {
+        url = '/api/load-device-data';
+        payload.device_name = deviceName;
+    } else {
+        url = '/api/load-rmcab-data';
+        payload.station_code = config.station ?? 6;
+    }
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        let message = 'Error al cargar los datos';
+        try {
+            const errorResponse = await response.json();
+            if (errorResponse && errorResponse.error) {
+                message = errorResponse.error;
+            }
+        } catch (parseError) {
+            console.warn('No se pudo interpretar el error recibido del servidor', parseError);
+        }
+        throw new Error(message);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+        throw new Error(result.error || 'No se pudo obtener la informacion solicitada');
+    }
+
+    deviceDataCache[deviceName] = result;
+    return result;
+}
+
+function showSingleSensorView() {
+    activeViewMode = 'single';
+    dataSection.style.display = 'block';
+    multiSensorSection.style.display = 'none';
+    calibrationSection.style.display = 'none';
+    comparisonSection.style.display = 'none';
+}
+
+
 
 /**
  * Genera visualizaciones de datos
  */
-async function generateDataVisualizations(data) {
+async function generateDataVisualizations(data, deviceLabel = null) {
     // Calcular métricas resumen
     displayMetrics(data);
 
     // Generar gráficos
-    createTimeSeriesPlot(data);
-    createBoxPlots(data);
+    createTimeSeriesPlot(data, deviceLabel);
+    createBoxPlots(data, deviceLabel);
 }
 
 /**
@@ -135,6 +265,14 @@ function displayMetrics(data) {
     const pm25Values = data.map(d => d.pm25).filter(v => v != null);
     const pm10Values = data.map(d => d.pm10).filter(v => v != null);
 
+    const pm25Average = pm25Values.length
+        ? (pm25Values.reduce((sum, value) => sum + value, 0) / pm25Values.length).toFixed(2) + ' ug/m3'
+        : 'Sin datos';
+
+    const pm10Average = pm10Values.length
+        ? (pm10Values.reduce((sum, value) => sum + value, 0) / pm10Values.length).toFixed(2) + ' ug/m3'
+        : 'Sin datos';
+
     const metrics = [
         {
             icon: 'database-fill',
@@ -145,13 +283,13 @@ function displayMetrics(data) {
         {
             icon: 'wind',
             title: 'PM2.5 Promedio',
-            value: (pm25Values.reduce((a, b) => a + b, 0) / pm25Values.length).toFixed(2) + ' µg/m³',
+            value: pm25Average,
             color: 'success'
         },
         {
             icon: 'cloud-haze2',
             title: 'PM10 Promedio',
-            value: (pm10Values.reduce((a, b) => a + b, 0) / pm10Values.length).toFixed(2) + ' µg/m³',
+            value: pm10Average,
             color: 'info'
         },
         {
@@ -174,295 +312,6 @@ function displayMetrics(data) {
     });
 }
 
-/**
- * Crea gráfico de series de tiempo
- */
-function createTimeSeriesPlot(data) {
-    const traces = [];
-
-    // PM2.5
-    if (data.some(d => d.pm25 != null)) {
-        traces.push({
-            x: data.map(d => d.datetime),
-            y: data.map(d => d.pm25),
-            type: 'scatter',
-            mode: 'lines',
-            name: 'PM2.5',
-            line: { color: '#2d5016', width: 2 }
-        });
-    }
-
-    // PM10
-    if (data.some(d => d.pm10 != null)) {
-        traces.push({
-            x: data.map(d => d.datetime),
-            y: data.map(d => d.pm10),
-            type: 'scatter',
-            mode: 'lines',
-            name: 'PM10',
-            line: { color: '#0077b6', width: 2 }
-        });
-    }
-
-    const layout = {
-        title: `${selectedDevice} - Series de Tiempo`,
-        xaxis: { title: 'Fecha y Hora' },
-        yaxis: { title: 'Concentración (µg/m³)' },
-        hovermode: 'x unified',
-        height: 500,
-        shapes: [
-            // Límite OMS PM2.5
-            {
-                type: 'line',
-                x0: data[0].datetime,
-                x1: data[data.length - 1].datetime,
-                y0: 15,
-                y1: 15,
-                line: { color: 'orange', width: 2, dash: 'dash' }
-            },
-            // Límite Colombia PM2.5
-            {
-                type: 'line',
-                x0: data[0].datetime,
-                x1: data[data.length - 1].datetime,
-                y0: 25,
-                y1: 25,
-                line: { color: 'red', width: 2, dash: 'dash' }
-            }
-        ]
-    };
-
-    Plotly.newPlot('timeseriesPlot', traces, layout, { responsive: true });
-}
-
-/**
- * Crea box plots
- */
-function createBoxPlots(data) {
-    // PM2.5
-    const pm25Data = data.map(d => d.pm25).filter(v => v != null);
-    const tracePM25 = {
-        y: pm25Data,
-        type: 'box',
-        name: 'PM2.5',
-        marker: { color: '#2d5016' },
-        boxmean: 'sd'
-    };
-
-    const layoutPM25 = {
-        yaxis: { title: 'Concentración (µg/m³)' },
-        height: 400
-    };
-
-    Plotly.newPlot('boxplotPM25', [tracePM25], layoutPM25, { responsive: true });
-
-    // PM10
-    const pm10Data = data.map(d => d.pm10).filter(v => v != null);
-    const tracePM10 = {
-        y: pm10Data,
-        type: 'box',
-        name: 'PM10',
-        marker: { color: '#0077b6' },
-        boxmean: 'sd'
-    };
-
-    const layoutPM10 = {
-        yaxis: { title: 'Concentración (µg/m³)' },
-        height: 400
-    };
-
-    Plotly.newPlot('boxplotPM10', [tracePM10], layoutPM10, { responsive: true });
-}
-
-/**
- * Ejecuta calibración
- */
-async function runCalibration() {
-    if (!currentData || selectedDeviceType !== 'sensor') {
-        showAlert('La calibración solo está disponible para sensores de bajo costo', 'warning');
-        return;
-    }
-
-    showLoading('Ejecutando calibración con 5 modelos de Machine Learning...<br>Esto puede tardar 2-3 minutos');
-
-    try {
-        const response = await fetch('/api/calibrate-device', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                device_name: selectedDevice,
-                start_date: '2025-06-01',
-                end_date: '2025-07-31',
-                pollutant: 'pm25'
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Error en la calibración');
-        }
-
-        const result = await response.json();
-
-        if (result.success && result.results && result.results.length > 0) {
-            calibrationResults = result.results;
-            displayCalibrationResults(result.results);
-            showAlert('✓ Calibración completada exitosamente', 'success');
-
-            // Mostrar sección de calibración
-            calibrationSection.style.display = 'block';
-            calibrationSection.scrollIntoView({ behavior: 'smooth' });
-
-        } else {
-            throw new Error('No se obtuvieron resultados de calibración');
-        }
-
-    } catch (error) {
-        showAlert(`Error: ${error.message}`, 'danger');
-        console.error(error);
-    } finally {
-        hideLoading();
-    }
-}
-
-/**
- * Muestra resultados de calibración
- */
-function displayCalibrationResults(results) {
-    const table = document.getElementById('calibrationResultsTable');
-    table.innerHTML = '';
-
-    results.forEach((result, index) => {
-        const row = `
-            <tr class="${index === 0 ? 'table-success' : ''}">
-                <td>
-                    <strong>${result.model_name}</strong>
-                    ${index === 0 ? '<span class="badge bg-success ms-2">Mejor</span>' : ''}
-                </td>
-                <td>${result.r2}</td>
-                <td>${result.rmse}</td>
-                <td>${result.mae}</td>
-                <td>${result.mape}%</td>
-                <td>
-                    ${result.r2 > 0.8 ? '<span class="badge bg-success">Excelente</span>' :
-                      result.r2 > 0.6 ? '<span class="badge bg-warning">Bueno</span>' :
-                      '<span class="badge bg-danger">Regular</span>'}
-                </td>
-            </tr>
-        `;
-        table.insertAdjacentHTML('beforeend', row);
-    });
-
-    // Mejor modelo
-    const best = results[0];
-    document.getElementById('bestModelAlert').innerHTML = `
-        <h5><i class="bi bi-trophy-fill"></i> Mejor Modelo: ${best.model_name}</h5>
-        <p class="mb-0">
-            <strong>R² = ${best.r2}</strong> |
-            RMSE = ${best.rmse} µg/m³ |
-            MAE = ${best.mae} µg/m³ |
-            MAPE = ${best.mape}%
-        </p>
-    `;
-
-    // Gráfico de efectividad
-    createEffectivenessPlot(results);
-
-    // Scatter plots individuales
-    createScatterPlots(results);
-}
-
-/**
- * Crea gráfico de efectividad
- */
-function createEffectivenessPlot(results) {
-    const models = results.map(r => r.model_name);
-    const r2 = results.map(r => r.r2);
-    const rmse = results.map(r => r.rmse);
-    const mae = results.map(r => r.mae);
-    const mape = results.map(r => r.mape);
-
-    const traces = [
-        { x: models, y: r2, name: 'R²', type: 'bar', yaxis: 'y' },
-        { x: models, y: rmse, name: 'RMSE', type: 'bar', yaxis: 'y2' },
-        { x: models, y: mae, name: 'MAE', type: 'bar', yaxis: 'y3' },
-        { x: models, y: mape, name: 'MAPE (%)', type: 'bar', yaxis: 'y4' }
-    ];
-
-    const layout = {
-        title: 'Comparación de Métricas por Modelo',
-        grid: { rows: 2, columns: 2, pattern: 'independent' },
-        height: 600
-    };
-
-    Plotly.newPlot('effectivenessPlot', traces, layout, { responsive: true });
-}
-
-/**
- * Crea scatter plots de cada modelo
- */
-function createScatterPlots(results) {
-    const container = document.getElementById('scatterPlotsContainer');
-    container.innerHTML = '';
-
-    results.forEach((result, index) => {
-        const plotDiv = `
-            <div class="col-md-6 mb-4">
-                <div class="plot-container">
-                    <h6>${result.model_name}</h6>
-                    <div id="scatterPlot${index}"></div>
-                </div>
-            </div>
-        `;
-        container.insertAdjacentHTML('beforeend', plotDiv);
-
-        // Nota: En producción, necesitarías los datos reales y predichos del servidor
-        // Aquí creamos un ejemplo
-        createScatterPlotForModel(result, index);
-    });
-}
-
-/**
- * Crea scatter plot individual
- */
-function createScatterPlotForModel(result, index) {
-    // Este es un ejemplo - en producción necesitarías los datos reales
-    const trace = {
-        x: [10, 20, 30, 40, 50],
-        y: [12, 19, 31, 38, 52],
-        mode: 'markers',
-        type: 'scatter',
-        name: 'Predicciones',
-        marker: { color: '#2d5016', size: 8 }
-    };
-
-    const perfectLine = {
-        x: [0, 60],
-        y: [0, 60],
-        mode: 'lines',
-        name: 'Línea Perfecta',
-        line: { color: 'red', dash: 'dash' }
-    };
-
-    const layout = {
-        xaxis: { title: 'PM2.5 Real (µg/m³)' },
-        yaxis: { title: 'PM2.5 Predicho (µg/m³)' },
-        height: 350,
-        annotations: [{
-            text: `R² = ${result.r2}`,
-            x: 0.05,
-            y: 0.95,
-            xref: 'paper',
-            yref: 'paper',
-            showarrow: false
-        }]
-    };
-
-    Plotly.newPlot(`scatterPlot${index}`, [trace, perfectLine], layout, { responsive: true });
-}
-
-/**
- * Utilidades
- */
 function showLoading(message = 'Cargando...') {
     loadingMessage.innerHTML = message;
     loadingOverlay.classList.add('active');
@@ -486,4 +335,99 @@ function showAlert(message, type = 'info') {
     setTimeout(() => {
         alertDiv.remove();
     }, 5000);
+}
+async function showComparisonView() {
+    activeViewMode = 'comparison';
+
+    const comparisonButton = document.querySelector('.quick-view-btn[data-view="comparison"]');
+    setActiveQuickButton(comparisonButton);
+    showLoading('Preparando comparativa de sensores...');
+
+    try {
+        const datasets = {};
+
+        for (const deviceName of DEVICE_ORDER) {
+            try {
+                const result = await getDeviceData(deviceName);
+                datasets[deviceName] = result.data || [];
+            } catch (loadError) {
+                console.error(`Error cargando ${deviceName}:`, loadError);
+                datasets[deviceName] = [];
+            }
+        }
+
+        renderComparisonPlots(datasets);
+
+        dataSection.style.display = 'none';
+        calibrationSection.style.display = 'none';
+        comparisonSection.style.display = 'none';
+        multiSensorSection.style.display = 'block';
+        multiSensorSection.scrollIntoView({ behavior: 'smooth' });
+    } catch (error) {
+        showAlert(`Error preparando comparativa: ${error.message}`, 'danger');
+        console.error(error);
+    } finally {
+        hideLoading();
+    }
+}
+
+function renderComparisonPlots(datasets) {
+    DEVICE_ORDER.forEach(deviceName => {
+        const containerId = `comparisonPlot${deviceName}`;
+        const container = document.getElementById(containerId);
+        if (!container) {
+            return;
+        }
+
+        const deviceData = Array.isArray(datasets[deviceName]) ? datasets[deviceName] : [];
+        const pm25Values = deviceData.filter(d => d.pm25 != null);
+        const pm10Values = deviceData.filter(d => d.pm10 != null);
+        const pm25Count = pm25Values.length;
+        const pm10Count = pm10Values.length;
+
+        if (!pm25Count && !pm10Count) {
+            container.innerHTML = '<p class="text-muted mb-0">Sin datos disponibles.</p>';
+            Plotly.purge(container);
+            return;
+        }
+
+        container.innerHTML = '';
+
+        const label = DEVICE_CONFIG[deviceName]?.label || deviceName;
+        const traces = [];
+
+        if (pm25Count) {
+            traces.push({
+                x: pm25Values.map(d => d.datetime),
+                y: pm25Values.map(d => d.pm25),
+                type: 'scatter',
+                mode: 'lines',
+                name: `PM2.5 (n=${pm25Count})`,
+                line: { color: SERIES_COLORS.pm25, width: 2 }
+            });
+        }
+
+        if (pm10Count) {
+            traces.push({
+                x: pm10Values.map(d => d.datetime),
+                y: pm10Values.map(d => d.pm10),
+                type: 'scatter',
+                mode: 'lines',
+                name: `PM10 (n=${pm10Count})`,
+                line: { color: SERIES_COLORS.pm10, width: 2 }
+            });
+        }
+
+        const layout = {
+            title: `${label} (PM2.5: ${pm25Count} | PM10: ${pm10Count})`,
+            margin: { t: 40, r: 20, l: 50, b: 50 },
+            hovermode: 'x unified',
+            height: 320,
+            legend: { orientation: 'h', x: 0, y: -0.2 },
+            xaxis: { title: 'Fecha y Hora' },
+            yaxis: { title: 'Concentracion (ug/m3)' }
+        };
+
+        Plotly.newPlot(container, traces, layout, { responsive: true });
+    });
 }
