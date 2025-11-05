@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Modelos de Calibración{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero" style="padding: 3rem 0;">
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <h1>
+                    <i class="bi bi-cpu-fill"></i>
+                    Modelos de Calibración y Predicción
+                </h1>
+                <p class="lead">
+                    Algoritmos de Machine Learning para mejorar la precisión de sensores de bajo costo
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Introducción -->
+<section class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <div class="card shadow-custom border-0 mb-4">
+                    <div class="card-body p-5">
+                        <h3 class="mb-4">
+                            <i class="bi bi-info-circle-fill text-primary-custom"></i>
+                            ¿Por qué calibrar los sensores?
+                        </h3>
+                        <p class="lead">
+                            Los sensores de bajo costo (como el PMS5003) son excelentes para ampliar la cobertura de monitoreo, pero presentan desviaciones en sus mediciones que deben ser corregidas.
+                        </p>
+                        <p>
+                            Utilizamos <strong>Machine Learning</strong> para calibrar las lecturas de los sensores contra datos de referencia de la RMCAB (Red de Monitoreo de Calidad del Aire de Bogotá), considerando variables ambientales como:
+                        </p>
+                        <ul>
+                            <li><strong>PM2.5 y PM10 raw:</strong> Lecturas directas del sensor</li>
+                            <li><strong>Humedad relativa:</strong> Afecta el tamaño de las partículas</li>
+                            <li><strong>Temperatura:</strong> Influye en la densidad del aire</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Modelos Implementados -->
+<section class="section bg-light">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="section-title">Modelos Implementados</h2>
+            <p class="section-subtitle">Comparación de 5 algoritmos de Machine Learning</p>
+        </div>
+
+        <div class="row g-4">
+            <!-- Modelo 1: Linear Regression -->
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom">
+                        <i class="bi bi-graph-up"></i> Regresión Lineal
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Linear Regression</h5>
+                        <p class="card-text">
+                            Modelo estadístico que establece una relación lineal entre las variables de entrada y la salida.
+                        </p>
+                        <h6>Ventajas:</h6>
+                        <ul>
+                            <li>Simple e interpretable</li>
+                            <li>Rápido entrenamiento</li>
+                            <li>Bajo riesgo de overfitting</li>
+                        </ul>
+                        <h6>Desventajas:</h6>
+                        <ul>
+                            <li>Asume relaciones lineales</li>
+                            <li>Limitado para patrones complejos</li>
+                        </ul>
+                        <div class="mt-3">
+                            <span class="badge bg-success">Baseline</span>
+                            <span class="badge bg-info">Rápido</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modelo 2: Random Forest -->
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom card-header-blue">
+                        <i class="bi bi-diagram-3-fill"></i> Random Forest
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Random Forest Regressor</h5>
+                        <p class="card-text">
+                            Ensemble de múltiples árboles de decisión que promedian sus predicciones para mayor robustez.
+                        </p>
+                        <h6>Ventajas:</h6>
+                        <ul>
+                            <li>Captura relaciones no lineales</li>
+                            <li>Robusto ante outliers</li>
+                            <li>Maneja interacciones complejas</li>
+                        </ul>
+                        <h6>Desventajas:</h6>
+                        <ul>
+                            <li>Menos interpretable</li>
+                            <li>Mayor tiempo de entrenamiento</li>
+                        </ul>
+                        <div class="mt-3">
+                            <span class="badge bg-primary">Ensemble</span>
+                            <span class="badge bg-warning text-dark">Alto rendimiento</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modelo 3: SVR Linear -->
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom card-header-teal">
+                        <i class="bi bi-bezier2"></i> SVR Lineal
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Support Vector Regression (Lineal)</h5>
+                        <p class="card-text">
+                            Encuentra el hiperplano óptimo que mejor ajusta los datos con un margen de tolerancia.
+                        </p>
+                        <h6>Ventajas:</h6>
+                        <ul>
+                            <li>Eficiente en alta dimensionalidad</li>
+                            <li>Robusto ante outliers</li>
+                            <li>Control de margen de error</li>
+                        </ul>
+                        <h6>Desventajas:</h6>
+                        <ul>
+                            <li>Sensible a hiperparámetros</li>
+                            <li>Requiere normalización de datos</li>
+                        </ul>
+                        <div class="mt-3">
+                            <span class="badge bg-info">SVM</span>
+                            <span class="badge bg-secondary">Kernel Lineal</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modelo 4: SVR RBF -->
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom card-header-teal">
+                        <i class="bi bi-radioactive"></i> SVR RBF
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Support Vector Regression (RBF)</h5>
+                        <p class="card-text">
+                            SVR con kernel de función de base radial (RBF) para relaciones no lineales complejas.
+                        </p>
+                        <h6>Ventajas:</h6>
+                        <ul>
+                            <li>Captura patrones no lineales</li>
+                            <li>Flexible y adaptable</li>
+                            <li>Bueno con datos complejos</li>
+                        </ul>
+                        <h6>Desventajas:</h6>
+                        <ul>
+                            <li>Más lento que lineal</li>
+                            <li>Riesgo de overfitting</li>
+                        </ul>
+                        <div class="mt-3">
+                            <span class="badge bg-info">SVM</span>
+                            <span class="badge bg-warning text-dark">Kernel RBF</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modelo 5: SVR Polynomial -->
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom card-header-teal">
+                        <i class="bi bi-distribute-vertical"></i> SVR Polinomial
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Support Vector Regression (Polynomial)</h5>
+                        <p class="card-text">
+                            SVR con kernel polinomial para capturar relaciones cuadráticas y de orden superior.
+                        </p>
+                        <h6>Ventajas:</h6>
+                        <ul>
+                            <li>Modela relaciones polinómicas</li>
+                            <li>Bueno para curvaturas</li>
+                            <li>Control de grado polinomial</li>
+                        </ul>
+                        <h6>Desventajas:</h6>
+                        <ul>
+                            <li>Puede ser inestable</li>
+                            <li>Riesgo de overfitting alto</li>
+                        </ul>
+                        <div class="mt-3">
+                            <span class="badge bg-info">SVM</span>
+                            <span class="badge bg-danger">Kernel Poly</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Métricas de Evaluación -->
+<section class="section">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="section-title">Métricas de Evaluación</h2>
+            <p class="section-subtitle">¿Cómo medimos el desempeño de los modelos?</p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+                <div class="card text-center h-100 border-primary">
+                    <div class="card-body">
+                        <h3 class="text-primary-custom">R²</h3>
+                        <h6 class="mb-3">Coeficiente de Determinación</h6>
+                        <p class="small">
+                            Indica qué proporción de la varianza en los datos es explicada por el modelo. Valores cercanos a 1 son mejores.
+                        </p>
+                        <div class="mt-3">
+                            <span class="badge bg-success">Rango: 0 a 1</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card text-center h-100 border-danger">
+                    <div class="card-body">
+                        <h3 class="text-danger">RMSE</h3>
+                        <h6 class="mb-3">Root Mean Squared Error</h6>
+                        <p class="small">
+                            Mide el error promedio en las mismas unidades que los datos (µg/m³). Valores más bajos son mejores.
+                        </p>
+                        <div class="mt-3">
+                            <span class="badge bg-danger">Penaliza errores grandes</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card text-center h-100 border-warning">
+                    <div class="card-body">
+                        <h3 class="text-warning">MAE</h3>
+                        <h6 class="mb-3">Mean Absolute Error</h6>
+                        <p class="small">
+                            Error absoluto promedio entre predicciones y valores reales. Más interpretable que RMSE.
+                        </p>
+                        <div class="mt-3">
+                            <span class="badge bg-warning text-dark">Unidades: µg/m³</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card text-center h-100 border-info">
+                    <div class="card-body">
+                        <h3 class="text-info">MAPE</h3>
+                        <h6 class="mb-3">Mean Absolute Percentage Error</h6>
+                        <p class="small">
+                            Error porcentual promedio. Útil para comparar modelos en diferentes escalas.
+                        </p>
+                        <div class="mt-3">
+                            <span class="badge bg-info">Expresado en %</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Proceso de Calibración -->
+<section class="section bg-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <h2 class="section-title text-center mb-5">Proceso de Calibración</h2>
+
+                <div class="row g-4">
+                    <div class="col-md-6 col-lg-3">
+                        <div class="text-center">
+                            <div class="bg-primary-custom text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                                <h2 class="mb-0">1</h2>
+                            </div>
+                            <h5>Carga de Datos</h5>
+                            <p class="small">
+                                Sensores de bajo costo (PostgreSQL) + RMCAB (API)
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3">
+                        <div class="text-center">
+                            <div class="bg-secondary-custom text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                                <h2 class="mb-0">2</h2>
+                            </div>
+                            <h5>Preprocesamiento</h5>
+                            <p class="small">
+                                Limpieza, merge temporal y normalización
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3">
+                        <div class="text-center">
+                            <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                                <h2 class="mb-0">3</h2>
+                            </div>
+                            <h5>Entrenamiento</h5>
+                            <p class="small">
+                                Train/test split (75/25) y validación cruzada
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3">
+                        <div class="text-center">
+                            <div class="bg-warning text-dark rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                                <h2 class="mb-0">4</h2>
+                            </div>
+                            <h5>Selección</h5>
+                            <p class="small">
+                                Mejor modelo basado en RMSE y R²
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center">
+                <h2 class="section-title">¿Quieres ver los resultados?</h2>
+                <p class="lead mb-4">
+                    Explora las visualizaciones y compara el desempeño de cada modelo
+                </p>
+                <a href="{{ url_for('visualizacion') }}" class="btn btn-primary-custom btn-lg">
+                    <i class="bi bi-graph-up"></i> Ver Resultados
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

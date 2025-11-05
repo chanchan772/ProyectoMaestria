@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Visualización de Datos{% endblock %}
+
+{% block extra_css %}
+<style>
+    .control-panel {
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+        margin-bottom: 2rem;
+    }
+    .plot-container {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+        margin-bottom: 2rem;
+    }
+    .stats-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        text-align: center;
+        height: 100%;
+    }
+    .stats-card h3 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 0.5rem 0;
+    }
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+    .loading-overlay.active {
+        display: flex;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="text-center text-white">
+        <div class="loading-spinner mb-3"></div>
+        <h4>Cargando datos...</h4>
+        <p id="loadingMessage">Por favor espera</p>
+    </div>
+</div>
+
+<!-- Hero Section -->
+<section class="hero" style="padding: 3rem 0;">
+    <div class="container">
+        <h1>
+            <i class="bi bi-graph-up"></i>
+            Visualización de Datos
+        </h1>
+        <p class="lead">
+            Explora y analiza datos de calidad del aire en tiempo real
+        </p>
+    </div>
+</section>
+
+<!-- Panel de Control -->
+<section class="section">
+    <div class="container">
+        <div class="control-panel">
+            <h3 class="mb-4">
+                <i class="bi bi-sliders"></i>
+                Panel de Control
+            </h3>
+
+            <div class="row g-4">
+                <!-- Selección de Fuente de Datos -->
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-database-fill"></i> Fuente de Datos
+                    </label>
+                    <select class="form-select" id="dataSource">
+                        <option value="lowcost">Sensores de Bajo Costo (Aire2, Aire4, Aire5)</option>
+                        <option value="rmcab">RMCAB - Estación Las Ferias</option>
+                        <option value="both">Ambas Fuentes (Comparación)</option>
+                    </select>
+                </div>
+
+                <!-- Tipo de Visualización -->
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-bar-chart-fill"></i> Tipo de Visualización
+                    </label>
+                    <select class="form-select" id="plotType">
+                        <option value="timeseries">Series de Tiempo</option>
+                        <option value="boxplot">Diagrama de Caja</option>
+                        <option value="heatmap">Mapa de Calor (Hora del Día)</option>
+                        <option value="scatter">Diagrama de Dispersión</option>
+                    </select>
+                </div>
+
+                <!-- Contaminante -->
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-cloud-haze2-fill"></i> Contaminante
+                    </label>
+                    <select class="form-select" id="pollutant">
+                        <option value="pm25">PM2.5</option>
+                        <option value="pm10">PM10</option>
+                        <option value="both">Ambos</option>
+                    </select>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="w-100">
+                        <button class="btn btn-primary-custom w-100 mb-2" id="btnLoadData">
+                            <i class="bi bi-arrow-clockwise"></i> Cargar Datos
+                        </button>
+                        <button class="btn btn-secondary-custom w-100" id="btnDownloadData" disabled>
+                            <i class="bi bi-download"></i> Descargar CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Resumen Estadístico -->
+<section class="section" id="statsSection" style="display: none;">
+    <div class="container">
+        <h3 class="mb-4">
+            <i class="bi bi-bar-chart-line-fill"></i>
+            Resumen Estadístico
+        </h3>
+
+        <div class="row g-3" id="statsContainer">
+            <!-- Se llenará dinámicamente -->
+        </div>
+    </div>
+</section>
+
+<!-- Visualizaciones -->
+<section class="section">
+    <div class="container">
+        <div id="plotsContainer">
+            <!-- Mensaje inicial -->
+            <div class="text-center py-5" id="initialMessage">
+                <i class="bi bi-graph-up display-1 text-muted"></i>
+                <h4 class="text-muted mt-3">Selecciona una fuente de datos y haz clic en "Cargar Datos"</h4>
+            </div>
+
+            <!-- Contenedor de gráficos -->
+            <div id="plotsContent" style="display: none;">
+                <div class="plot-container" id="plot1Container">
+                    <h4 id="plot1Title" class="mb-3"></h4>
+                    <div id="plot1"></div>
+                </div>
+
+                <div class="plot-container" id="plot2Container" style="display: none;">
+                    <h4 id="plot2Title" class="mb-3"></h4>
+                    <div id="plot2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Comparación de Modelos de Calibración -->
+<section class="section bg-light">
+    <div class="container">
+        <h3 class="mb-4 text-center">
+            <i class="bi bi-cpu-fill"></i>
+            Comparación de Modelos de Calibración
+        </h3>
+
+        <div class="row">
+            <div class="col-lg-10 mx-auto">
+                <div class="card shadow-custom border-0">
+                    <div class="card-body p-4">
+                        <p class="lead text-center mb-4">
+                            Ejecuta los modelos de calibración para comparar su desempeño
+                        </p>
+
+                        <div class="text-center">
+                            <button class="btn btn-primary-custom btn-lg" id="btnRunCalibration">
+                                <i class="bi bi-play-circle-fill"></i>
+                                Ejecutar Calibración
+                            </button>
+                        </div>
+
+                        <div id="calibrationResults" style="display: none;" class="mt-4">
+                            <h5 class="mb-3">Resultados de Calibración</h5>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Modelo</th>
+                                            <th>R²</th>
+                                            <th>RMSE (µg/m³)</th>
+                                            <th>MAE (µg/m³)</th>
+                                            <th>MAPE (%)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="calibrationResultsBody">
+                                        <!-- Se llenará dinámicamente -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="alert alert-success mt-3" id="bestModelAlert">
+                                <!-- Se llenará dinámicamente -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Información Adicional -->
+<section class="section">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-info-circle-fill display-3 text-primary-custom mb-3"></i>
+                        <h5>Límites Normativos</h5>
+                        <p class="small">
+                            Las líneas de referencia en los gráficos muestran:
+                        </p>
+                        <ul class="list-unstyled small text-start">
+                            <li><strong>OMS 2021:</strong> PM2.5: 15 µg/m³, PM10: 45 µg/m³</li>
+                            <li><strong>Colombia:</strong> PM2.5: 25 µg/m³, PM10: 50 µg/m³</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-calendar-range display-3 text-secondary-custom mb-3"></i>
+                        <h5>Período de Datos</h5>
+                        <p class="small">
+                            Los datos corresponden al período:
+                        </p>
+                        <p class="fw-bold">Junio - Julio 2024</p>
+                        <p class="small text-muted">
+                            60 días de mediciones continuas
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-geo-alt-fill display-3 text-success mb-3"></i>
+                        <h5>Ubicación</h5>
+                        <p class="small">
+                            Sensores ubicados en Bogotá:
+                        </p>
+                        <ul class="list-unstyled small text-start">
+                            <li><strong>Aire2, Aire4, Aire5:</strong> Zona urbana</li>
+                            <li><strong>RMCAB:</strong> Estación Las Ferias (referencia)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/visualizacion.js') }}"></script>
+{% endblock %}

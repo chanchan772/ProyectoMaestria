@@ -1,0 +1,519 @@
+{% extends "base.html" %}
+
+{% block title %}Definiciones Técnicas{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero" style="padding: 3rem 0;">
+    <div class="container">
+        <h1>
+            <i class="bi bi-book-fill"></i>
+            Glosario Técnico
+        </h1>
+        <p class="lead">
+            Definiciones, conceptos y estándares de calidad del aire
+        </p>
+    </div>
+</section>
+
+<!-- Material Particulado -->
+<section class="section">
+    <div class="container">
+        <h2 class="section-title">
+            <i class="bi bi-wind"></i>
+            Material Particulado (PM)
+        </h2>
+
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom">
+                        PM2.5 - Partículas Finas
+                    </div>
+                    <div class="card-body">
+                        <h5 class="mb-3">¿Qué es PM2.5?</h5>
+                        <p>
+                            Material particulado con diámetro aerodinámico <strong>≤ 2.5 micrómetros (µm)</strong>. Son partículas tan pequeñas que pueden penetrar profundamente en los pulmones y el torrente sanguíneo.
+                        </p>
+                        <h6>Fuentes principales:</h6>
+                        <ul>
+                            <li>Combustión de vehículos (diesel y gasolina)</li>
+                            <li>Emisiones industriales</li>
+                            <li>Quema de biomasa</li>
+                            <li>Reacciones atmosféricas (PM2.5 secundario)</li>
+                        </ul>
+                        <h6>Efectos en la salud:</h6>
+                        <ul class="text-danger">
+                            <li>Enfermedades cardiovasculares</li>
+                            <li>Enfermedades respiratorias (asma, EPOC)</li>
+                            <li>Reducción de función pulmonar</li>
+                            <li>Mortalidad prematura</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom card-header-blue">
+                        PM10 - Partículas Gruesas
+                    </div>
+                    <div class="card-body">
+                        <h5 class="mb-3">¿Qué es PM10?</h5>
+                        <p>
+                            Material particulado con diámetro aerodinámico <strong>≤ 10 micrómetros (µm)</strong>. Incluye partículas más grandes que pueden quedar atrapadas en las vías respiratorias superiores.
+                        </p>
+                        <h6>Fuentes principales:</h6>
+                        <ul>
+                            <li>Polvo de carreteras y construcción</li>
+                            <li>Procesos industriales</li>
+                            <li>Actividades agrícolas</li>
+                            <li>Erosión del suelo</li>
+                        </ul>
+                        <h6>Efectos en la salud:</h6>
+                        <ul class="text-danger">
+                            <li>Irritación de vías respiratorias</li>
+                            <li>Agravamiento de asma y bronquitis</li>
+                            <li>Tos y dificultad para respirar</li>
+                            <li>Reducción de capacidad pulmonar</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Índices de Calidad del Aire -->
+<section class="section bg-light">
+    <div class="container">
+        <h2 class="section-title text-center mb-5">
+            <i class="bi bi-speedometer2"></i>
+            Índices de Calidad del Aire (ICA)
+        </h2>
+
+        <!-- ICA - Colombia -->
+        <div class="card shadow-custom border-0 mb-4">
+            <div class="card-body p-4">
+                <h3 class="mb-4">
+                    <img src="https://flagcdn.com/w40/co.png" alt="Colombia" class="me-2">
+                    ICA Colombia (IDEAM)
+                </h3>
+                <p class="lead">
+                    El Índice de Calidad del Aire en Colombia está definido por el IDEAM y clasifica la calidad del aire en 6 categorías.
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Categoría</th>
+                                <th>ICA</th>
+                                <th>PM2.5 (µg/m³)</th>
+                                <th>PM10 (µg/m³)</th>
+                                <th>Color</th>
+                                <th>Significado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Buena</strong></td>
+                                <td>0-50</td>
+                                <td>0-12</td>
+                                <td>0-54</td>
+                                <td><span class="badge-aqi badge-good">Verde</span></td>
+                                <td>La calidad del aire es satisfactoria</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Aceptable</strong></td>
+                                <td>51-100</td>
+                                <td>12.1-37.5</td>
+                                <td>55-154</td>
+                                <td><span class="badge-aqi badge-moderate">Amarillo</span></td>
+                                <td>Calidad aceptable, riesgo moderado para grupos sensibles</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dañina a grupos sensibles</strong></td>
+                                <td>101-150</td>
+                                <td>37.6-55.4</td>
+                                <td>155-254</td>
+                                <td><span class="badge-aqi badge-unhealthy-sensitive">Naranja</span></td>
+                                <td>Riesgo para niños, ancianos y personas con enfermedades</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dañina</strong></td>
+                                <td>151-200</td>
+                                <td>55.5-150.4</td>
+                                <td>255-354</td>
+                                <td><span class="badge-aqi badge-unhealthy">Rojo</span></td>
+                                <td>Toda la población puede experimentar efectos adversos</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Muy dañina</strong></td>
+                                <td>201-300</td>
+                                <td>150.5-250.4</td>
+                                <td>355-424</td>
+                                <td><span class="badge-aqi badge-very-unhealthy">Púrpura</span></td>
+                                <td>Alerta sanitaria, toda la población en riesgo</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Peligrosa</strong></td>
+                                <td>301-500</td>
+                                <td>250.5+</td>
+                                <td>425+</td>
+                                <td><span class="badge-aqi badge-hazardous">Marrón</span></td>
+                                <td>Emergencia sanitaria, efectos serios en toda la población</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- AQI - Estados Unidos (EPA) -->
+        <div class="card shadow-custom border-0 mb-4">
+            <div class="card-body p-4">
+                <h3 class="mb-4">
+                    <img src="https://flagcdn.com/w40/us.png" alt="USA" class="me-2">
+                    AQI Estados Unidos (EPA)
+                </h3>
+                <p class="lead">
+                    Air Quality Index definido por la Environmental Protection Agency (EPA) de Estados Unidos.
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Categoría</th>
+                                <th>AQI</th>
+                                <th>PM2.5 (µg/m³)</th>
+                                <th>PM10 (µg/m³)</th>
+                                <th>Color</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Good</strong></td>
+                                <td>0-50</td>
+                                <td>0-12.0</td>
+                                <td>0-54</td>
+                                <td><span class="badge-aqi badge-good">Verde</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Moderate</strong></td>
+                                <td>51-100</td>
+                                <td>12.1-35.4</td>
+                                <td>55-154</td>
+                                <td><span class="badge-aqi badge-moderate">Amarillo</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Unhealthy for Sensitive Groups</strong></td>
+                                <td>101-150</td>
+                                <td>35.5-55.4</td>
+                                <td>155-254</td>
+                                <td><span class="badge-aqi badge-unhealthy-sensitive">Naranja</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Unhealthy</strong></td>
+                                <td>151-200</td>
+                                <td>55.5-150.4</td>
+                                <td>255-354</td>
+                                <td><span class="badge-aqi badge-unhealthy">Rojo</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Very Unhealthy</strong></td>
+                                <td>201-300</td>
+                                <td>150.5-250.4</td>
+                                <td>355-424</td>
+                                <td><span class="badge-aqi badge-very-unhealthy">Púrpura</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Hazardous</strong></td>
+                                <td>301-500</td>
+                                <td>250.5-500.4</td>
+                                <td>425-604</td>
+                                <td><span class="badge-aqi badge-hazardous">Marrón</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guías OMS -->
+        <div class="card shadow-custom border-0 mb-4">
+            <div class="card-body p-4">
+                <h3 class="mb-4">
+                    <i class="bi bi-globe2"></i>
+                    Guías de Calidad del Aire - OMS (2021)
+                </h3>
+                <p class="lead">
+                    La Organización Mundial de la Salud (OMS) establece niveles de referencia basados en evidencia científica para proteger la salud pública.
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Contaminante</th>
+                                <th>Tiempo de Exposición</th>
+                                <th>Nivel (µg/m³)</th>
+                                <th>Nivel Anterior (2005)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="2"><strong>PM2.5</strong></td>
+                                <td>Promedio anual</td>
+                                <td class="bg-warning bg-opacity-10">5</td>
+                                <td>10</td>
+                            </tr>
+                            <tr>
+                                <td>24 horas</td>
+                                <td class="bg-warning bg-opacity-10">15</td>
+                                <td>25</td>
+                            </tr>
+                            <tr>
+                                <td rowspan="2"><strong>PM10</strong></td>
+                                <td>Promedio anual</td>
+                                <td class="bg-info bg-opacity-10">15</td>
+                                <td>20</td>
+                            </tr>
+                            <tr>
+                                <td>24 horas</td>
+                                <td class="bg-info bg-opacity-10">45</td>
+                                <td>50</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted">
+                    <small>
+                        <i class="bi bi-info-circle"></i>
+                        Las guías de 2021 son significativamente más estrictas que las de 2005, reflejando nueva evidencia sobre impactos en salud a niveles más bajos.
+                    </small>
+                </p>
+            </div>
+        </div>
+
+        <!-- Europa (EEA) -->
+        <div class="card shadow-custom border-0">
+            <div class="card-body p-4">
+                <h3 class="mb-4">
+                    <img src="https://flagcdn.com/w40/eu.png" alt="EU" class="me-2">
+                    Estándares Europeos (EEA)
+                </h3>
+                <p class="lead">
+                    La Agencia Europea de Medio Ambiente (EEA) define límites para proteger la salud ciudadana.
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Contaminante</th>
+                                <th>Tiempo de Exposición</th>
+                                <th>Valor Límite (µg/m³)</th>
+                                <th>Objetivo 2030</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>PM2.5</strong></td>
+                                <td>Promedio anual</td>
+                                <td>25 (actual)</td>
+                                <td>10</td>
+                            </tr>
+                            <tr>
+                                <td rowspan="2"><strong>PM10</strong></td>
+                                <td>Promedio anual</td>
+                                <td>40</td>
+                                <td>20</td>
+                            </tr>
+                            <tr>
+                                <td>24 horas</td>
+                                <td>50 (35 excedencias/año)</td>
+                                <td>45</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Métricas de Machine Learning -->
+<section class="section">
+    <div class="container">
+        <h2 class="section-title text-center mb-5">
+            <i class="bi bi-calculator-fill"></i>
+            Métricas de Evaluación de Modelos
+        </h2>
+
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom">
+                        R² (Coeficiente de Determinación)
+                    </div>
+                    <div class="card-body">
+                        <h5>Definición</h5>
+                        <p>
+                            Mide la proporción de la varianza en la variable dependiente que es predecible desde las variables independientes.
+                        </p>
+                        <div class="bg-light p-3 rounded mb-3">
+                            <code>
+                                R² = 1 - (SS_residual / SS_total)
+                            </code>
+                        </div>
+                        <h6>Interpretación:</h6>
+                        <ul>
+                            <li><strong>R² = 1:</strong> Predicción perfecta</li>
+                            <li><strong>R² = 0.8-0.9:</strong> Muy buena predicción</li>
+                            <li><strong>R² = 0.6-0.8:</strong> Buena predicción</li>
+                            <li><strong>R² < 0.6:</strong> Predicción débil</li>
+                            <li><strong>R² < 0:</strong> Modelo peor que promedio simple</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom card-header-blue">
+                        RMSE (Root Mean Squared Error)
+                    </div>
+                    <div class="card-body">
+                        <h5>Definición</h5>
+                        <p>
+                            Raíz cuadrada del promedio de los errores al cuadrado. Penaliza más los errores grandes.
+                        </p>
+                        <div class="bg-light p-3 rounded mb-3">
+                            <code>
+                                RMSE = √(Σ(y_real - y_pred)² / n)
+                            </code>
+                        </div>
+                        <h6>Características:</h6>
+                        <ul>
+                            <li>Expresado en las mismas unidades que los datos (µg/m³)</li>
+                            <li>Sensible a outliers</li>
+                            <li>Valores más bajos = mejor modelo</li>
+                            <li>Se compara con la desviación estándar de los datos</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom card-header-teal">
+                        MAE (Mean Absolute Error)
+                    </div>
+                    <div class="card-body">
+                        <h5>Definición</h5>
+                        <p>
+                            Promedio de los valores absolutos de los errores. Más interpretable y robusto que RMSE.
+                        </p>
+                        <div class="bg-light p-3 rounded mb-3">
+                            <code>
+                                MAE = Σ|y_real - y_pred| / n
+                            </code>
+                        </div>
+                        <h6>Características:</h6>
+                        <ul>
+                            <li>Fácil de interpretar: error promedio en µg/m³</li>
+                            <li>Menos sensible a outliers que RMSE</li>
+                            <li>Todos los errores pesan igual</li>
+                            <li>Útil para reportes a stakeholders</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header-custom" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                        MAPE (Mean Absolute Percentage Error)
+                    </div>
+                    <div class="card-body">
+                        <h5>Definición</h5>
+                        <p>
+                            Promedio de los errores porcentuales absolutos. Útil para comparar modelos con diferentes escalas.
+                        </p>
+                        <div class="bg-light p-3 rounded mb-3">
+                            <code>
+                                MAPE = (100/n) × Σ|(y_real - y_pred)/y_real|
+                            </code>
+                        </div>
+                        <h6>Características:</h6>
+                        <ul>
+                            <li>Expresado en porcentaje (%)</li>
+                            <li>Fácil de comunicar: "el modelo se equivoca X% en promedio"</li>
+                            <li>Problemas con valores reales cercanos a cero</li>
+                            <li>Independiente de la escala de medición</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Normativa Colombia -->
+<section class="section bg-light">
+    <div class="container">
+        <h2 class="section-title text-center mb-4">
+            <i class="bi bi-file-text-fill"></i>
+            Normativa Colombiana
+        </h2>
+
+        <div class="card shadow-custom border-0">
+            <div class="card-body p-4">
+                <h4 class="mb-3">Resolución 2254 de 2017 (MinAmbiente)</h4>
+                <p class="lead">
+                    Establece los niveles máximos permisibles de contaminantes en el aire ambiente.
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Contaminante</th>
+                                <th>Tiempo de Exposición</th>
+                                <th>Nivel Máximo Permisible</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="2"><strong>PM2.5</strong></td>
+                                <td>Promedio anual</td>
+                                <td>25 µg/m³</td>
+                            </tr>
+                            <tr>
+                                <td>24 horas</td>
+                                <td>50 µg/m³</td>
+                            </tr>
+                            <tr>
+                                <td rowspan="2"><strong>PM10</strong></td>
+                                <td>Promedio anual</td>
+                                <td>50 µg/m³</td>
+                            </tr>
+                            <tr>
+                                <td>24 horas</td>
+                                <td>100 µg/m³</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-warning mt-3">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>Nota:</strong> Estos niveles son menos estrictos que las guías de la OMS 2021, lo que representa un área de mejora para la política ambiental colombiana.
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,27 @@
+# Framework Web
+Flask>=3.0.0
+gunicorn>=21.2.0
+
+# Visualización de datos
+plotly>=5.19.0
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# Manejo de datos
+pandas>=2.2.0
+numpy>=1.26.0
+
+# Machine Learning
+scikit-learn>=1.4.0
+
+# Base de datos
+psycopg2-binary>=2.9.9
+
+# Peticiones HTTP
+requests>=2.31.0
+
+# Procesamiento de archivos
+openpyxl>=3.1.2
+
+# Utilidades
+python-dotenv>=1.0.0

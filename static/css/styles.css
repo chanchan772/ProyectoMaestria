@@ -1,0 +1,358 @@
+/*
+ * Estilos personalizados - Proyecto de Calidad del Aire
+ * Colores ambientales con buen contraste
+ */
+
+:root {
+    /* Colores principales - Tonos verdes y azules (medio ambiente) */
+    --primary-green: #2d5016;
+    --primary-green-light: #4a7c2c;
+    --primary-green-dark: #1a3009;
+
+    --secondary-blue: #0077b6;
+    --secondary-blue-light: #00b4d8;
+    --secondary-blue-dark: #03045e;
+
+    /* Colores complementarios */
+    --accent-teal: #14b8a6;
+    --accent-lime: #84cc16;
+
+    /* Calidad del aire - Índice de colores */
+    --aqi-good: #00e400;
+    --aqi-moderate: #ffff00;
+    --aqi-unhealthy-sensitive: #ff7e00;
+    --aqi-unhealthy: #ff0000;
+    --aqi-very-unhealthy: #8f3f97;
+    --aqi-hazardous: #7e0023;
+
+    /* Grises */
+    --gray-100: #f8f9fa;
+    --gray-200: #e9ecef;
+    --gray-300: #dee2e6;
+    --gray-800: #343a40;
+    --gray-900: #212529;
+
+    /* Fuentes */
+    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'Fira Code', 'Courier New', monospace;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-primary);
+    color: var(--gray-900);
+    line-height: 1.6;
+    background-color: var(--gray-100);
+}
+
+/* =======================
+   NAVBAR
+   ======================= */
+
+.navbar {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--primary-green-light) 100%);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 1rem 0;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: white !important;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.navbar-brand:hover {
+    color: var(--accent-lime) !important;
+}
+
+.navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 500;
+    padding: 0.5rem 1rem !important;
+    transition: all 0.3s ease;
+    border-radius: 0.375rem;
+}
+
+.navbar-nav .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white !important;
+}
+
+.navbar-nav .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white !important;
+}
+
+/* =======================
+   HERO SECTION
+   ======================= */
+
+.hero {
+    background: linear-gradient(135deg, var(--secondary-blue-dark) 0%, var(--secondary-blue) 100%);
+    color: white;
+    padding: 5rem 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.05)" d="M0,96L48,112C96,128,192,160,288,165.3C384,171,480,149,576,133.3C672,117,768,107,864,122.7C960,139,1056,181,1152,181.3C1248,181,1344,139,1392,117.3L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') no-repeat bottom;
+    background-size: cover;
+    opacity: 0.3;
+}
+
+.hero h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 1;
+}
+
+.hero p {
+    font-size: 1.25rem;
+    margin-bottom: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.hero .btn-hero {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+}
+
+/* =======================
+   CARDS
+   ======================= */
+
+.card {
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+}
+
+.card-header-custom {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--primary-green-light) 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 1rem 1rem 0 0 !important;
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.card-header-blue {
+    background: linear-gradient(135deg, var(--secondary-blue) 0%, var(--secondary-blue-light) 100%);
+}
+
+.card-header-teal {
+    background: linear-gradient(135deg, var(--accent-teal) 0%, #10b981 100%);
+}
+
+/* =======================
+   BUTTONS
+   ======================= */
+
+.btn-primary-custom {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--primary-green-light) 100%);
+    border: none;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-primary-custom:hover {
+    background: linear-gradient(135deg, var(--primary-green-dark) 0%, var(--primary-green) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(45, 80, 22, 0.3);
+}
+
+.btn-secondary-custom {
+    background: linear-gradient(135deg, var(--secondary-blue) 0%, var(--secondary-blue-light) 100%);
+    border: none;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary-custom:hover {
+    background: linear-gradient(135deg, var(--secondary-blue-dark) 0%, var(--secondary-blue) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 119, 182, 0.3);
+}
+
+/* =======================
+   BADGES
+   ======================= */
+
+.badge-aqi {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.badge-good { background-color: var(--aqi-good); color: var(--gray-900); }
+.badge-moderate { background-color: var(--aqi-moderate); color: var(--gray-900); }
+.badge-unhealthy-sensitive { background-color: var(--aqi-unhealthy-sensitive); color: white; }
+.badge-unhealthy { background-color: var(--aqi-unhealthy); color: white; }
+.badge-very-unhealthy { background-color: var(--aqi-very-unhealthy); color: white; }
+.badge-hazardous { background-color: var(--aqi-hazardous); color: white; }
+
+/* =======================
+   SECTIONS
+   ======================= */
+
+.section {
+    padding: 4rem 0;
+}
+
+.section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--primary-green-dark);
+}
+
+.section-subtitle {
+    font-size: 1.25rem;
+    color: var(--gray-800);
+    margin-bottom: 3rem;
+}
+
+/* =======================
+   FOOTER
+   ======================= */
+
+.footer {
+    background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-800) 100%);
+    color: white;
+    padding: 3rem 0 1.5rem;
+    margin-top: 4rem;
+}
+
+.footer a {
+    color: var(--accent-lime);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.footer a:hover {
+    color: var(--accent-teal);
+}
+
+/* =======================
+   LOADING SPINNER
+   ======================= */
+
+.loading-spinner {
+    display: inline-block;
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* =======================
+   RESPONSIVE
+   ======================= */
+
+@media (max-width: 768px) {
+    .hero h1 {
+        font-size: 2rem;
+    }
+
+    .hero p {
+        font-size: 1rem;
+    }
+
+    .section-title {
+        font-size: 2rem;
+    }
+
+    .navbar-brand {
+        font-size: 1.25rem;
+    }
+}
+
+/* =======================
+   UTILITIES
+   ======================= */
+
+.text-primary-custom {
+    color: var(--primary-green) !important;
+}
+
+.text-secondary-custom {
+    color: var(--secondary-blue) !important;
+}
+
+.bg-primary-custom {
+    background-color: var(--primary-green) !important;
+}
+
+.bg-secondary-custom {
+    background-color: var(--secondary-blue) !important;
+}
+
+.shadow-custom {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* =======================
+   ANIMATIONS
+   ======================= */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.fade-in-delay {
+    animation: fadeIn 0.6s ease-out 0.3s both;
+}

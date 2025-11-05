@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8 fade-in">
+                <h1>
+                    <i class="bi bi-wind"></i>
+                    Monitoreo Inteligente de Calidad del Aire
+                </h1>
+                <p class="lead">
+                    Estrategia integral para la validación, modelado predictivo y visualización de concentraciones de PM2.5 y PM10 mediante sensores de bajo costo
+                </p>
+                <div class="d-flex gap-3 flex-wrap">
+                    <a href="{{ url_for('modelos') }}" class="btn btn-light btn-hero">
+                        <i class="bi bi-cpu-fill"></i> Explorar Modelos
+                    </a>
+                    <a href="{{ url_for('visualizacion') }}" class="btn btn-outline-light btn-hero">
+                        <i class="bi bi-graph-up"></i> Ver Datos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Resumen del Proyecto -->
+<section class="section">
+    <div class="container">
+        <div class="text-center mb-5 fade-in">
+            <h2 class="section-title">¿Qué es este proyecto?</h2>
+            <p class="section-subtitle">
+                Una solución innovadora para ampliar el monitoreo de calidad del aire en Bogotá
+            </p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-4 fade-in">
+                <div class="card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="mb-3">
+                            <i class="bi bi-shield-check display-1 text-primary-custom"></i>
+                        </div>
+                        <h4 class="card-title">Validación</h4>
+                        <p class="card-text">
+                            Calibración rigurosa de sensores de bajo costo (PMS5003) contra datos de referencia de la RMCAB (Red de Monitoreo de Calidad del Aire de Bogotá)
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 fade-in-delay">
+                <div class="card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="mb-3">
+                            <i class="bi bi-cpu-fill display-1 text-secondary-custom"></i>
+                        </div>
+                        <h4 class="card-title">Modelado Predictivo</h4>
+                        <p class="card-text">
+                            Aplicación de algoritmos de Machine Learning: Regresión Lineal, Random Forest, Support Vector Regression para mejorar la precisión de las mediciones
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 fade-in-delay">
+                <div class="card h-100">
+                    <div class="card-body text-center p-4">
+                        <div class="mb-3">
+                            <i class="bi bi-bar-chart-line display-1 text-success"></i>
+                        </div>
+                        <h4 class="card-title">Visualización</h4>
+                        <p class="card-text">
+                            Plataforma web interactiva para explorar datos históricos, comparar modelos y analizar tendencias de contaminación atmosférica
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Problema y Justificación -->
+<section class="section bg-light">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6 mb-4 mb-lg-0">
+                <h2 class="section-title">El Problema</h2>
+                <p class="lead text-secondary">
+                    La contaminación del aire es uno de los mayores riesgos ambientales para la salud pública en ciudades como Bogotá.
+                </p>
+                <ul class="list-unstyled">
+                    <li class="mb-3">
+                        <i class="bi bi-check-circle-fill text-danger me-2"></i>
+                        <strong>Cobertura limitada:</strong> Las redes oficiales de monitoreo son costosas y tienen baja densidad espacial
+                    </li>
+                    <li class="mb-3">
+                        <i class="bi bi-check-circle-fill text-danger me-2"></i>
+                        <strong>Exposición desigual:</strong> Muchas zonas urbanas carecen de información sobre calidad del aire
+                    </li>
+                    <li class="mb-3">
+                        <i class="bi bi-check-circle-fill text-danger me-2"></i>
+                        <strong>Impacto en salud:</strong> PM2.5 y PM10 causan enfermedades respiratorias y cardiovasculares
+                    </li>
+                </ul>
+            </div>
+            <div class="col-lg-6">
+                <div class="card shadow-custom border-0">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-4">
+                            <i class="bi bi-lightbulb-fill text-warning"></i> Nuestra Solución
+                        </h5>
+                        <p>
+                            Utilizamos <strong>sensores de bajo costo</strong> como complemento a las estaciones oficiales, combinando:
+                        </p>
+                        <ul>
+                            <li>Tecnología accesible (sensor PMS5003)</li>
+                            <li>Calibración con métodos de Machine Learning</li>
+                            <li>Transmisión remota de datos en tiempo real</li>
+                            <li>Visualización web interactiva y accesible</li>
+                        </ul>
+                        <p class="mb-0 text-muted">
+                            <small>
+                                <i class="bi bi-info-circle"></i>
+                                Basado en evidencia científica de estudios en Barcelona, Medellín, Bogotá y Pamplona
+                            </small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Tecnologías Utilizadas -->
+<section class="section">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="section-title">Tecnologías Utilizadas</h2>
+            <p class="section-subtitle">Stack tecnológico del proyecto</p>
+        </div>
+
+        <div class="row g-4">
+            <!-- Hardware -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="bi bi-hdd-rack display-4 text-primary-custom mb-3"></i>
+                        <h5>Hardware</h5>
+                        <ul class="list-unstyled text-start">
+                            <li><small>• Sensor PMS5003</small></li>
+                            <li><small>• Dispositivos IoT (Aire2, Aire4, Aire5)</small></li>
+                            <li><small>• Transmisión LoRaWAN</small></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backend -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="bi bi-server display-4 text-success mb-3"></i>
+                        <h5>Backend</h5>
+                        <ul class="list-unstyled text-start">
+                            <li><small>• Python 3.11+</small></li>
+                            <li><small>• Flask</small></li>
+                            <li><small>• PostgreSQL</small></li>
+                            <li><small>• scikit-learn</small></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Frontend -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="bi bi-palette display-4 text-info mb-3"></i>
+                        <h5>Frontend</h5>
+                        <ul class="list-unstyled text-start">
+                            <li><small>• HTML5 / CSS3</small></li>
+                            <li><small>• Bootstrap 5</small></li>
+                            <li><small>• JavaScript</small></li>
+                            <li><small>• Chart.js / Plotly</small></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Science -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="bi bi-graph-up-arrow display-4 text-warning mb-3"></i>
+                        <h5>Data Science</h5>
+                        <ul class="list-unstyled text-start">
+                            <li><small>• Pandas / NumPy</small></li>
+                            <li><small>• Matplotlib / Seaborn</small></li>
+                            <li><small>• Plotly</small></li>
+                            <li><small>• Machine Learning</small></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action -->
+<section class="section bg-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center">
+                <h2 class="section-title">Explora el Proyecto</h2>
+                <p class="lead mb-4">
+                    Descubre cómo funcionan los modelos de calibración, visualiza datos en tiempo real y aprende sobre calidad del aire
+                </p>
+                <div class="d-flex gap-3 justify-content-center flex-wrap">
+                    <a href="{{ url_for('modelos') }}" class="btn btn-primary-custom btn-lg">
+                        <i class="bi bi-cpu-fill"></i> Ver Modelos
+                    </a>
+                    <a href="{{ url_for('definiciones') }}" class="btn btn-secondary-custom btn-lg">
+                        <i class="bi bi-book-fill"></i> Glosario Técnico
+                    </a>
+                    <a href="{{ url_for('acerca_de') }}" class="btn btn-outline-secondary btn-lg">
+                        <i class="bi bi-people-fill"></i> Conocer al Equipo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
