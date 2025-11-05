@@ -47,12 +47,12 @@ def acerca_de():
 
 @app.route('/visualizacion/junio-julio')
 def visualizacion_junio_julio():
-    """Página de visualización Junio-Julio 2024"""
+    """Página de visualización Junio-Julio 2025 (Sensores + Las Ferias)"""
     return render_template('visualizacion_junio_julio.html')
 
 @app.route('/visualizacion/2024')
 def visualizacion_2024():
-    """Página de visualización Periodo Completo 2024"""
+    """Página de visualización Periodo Completo 2024 (Sensores + Min Ambiente)"""
     return render_template('visualizacion_2024.html')
 
 # =======================

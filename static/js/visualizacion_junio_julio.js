@@ -65,8 +65,8 @@ async function loadDeviceData() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     device_name: selectedDevice,
-                    start_date: '2024-06-01',
-                    end_date: '2024-07-31'
+                    start_date: '2025-06-01',
+                    end_date: '2025-07-31'
                 })
             });
         } else {
@@ -77,8 +77,8 @@ async function loadDeviceData() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     station_code: parseInt(stationCode),
-                    start_date: '2024-06-01',
-                    end_date: '2024-07-31'
+                    start_date: '2025-06-01',
+                    end_date: '2025-07-31'
                 })
             });
         }
@@ -157,7 +157,7 @@ function displayMetrics(data) {
         {
             icon: 'calendar-range',
             title: 'Periodo',
-            value: 'Jun-Jul 2024',
+            value: 'Jun-Jul 2025',
             color: 'warning'
         }
     ];
@@ -291,8 +291,8 @@ async function runCalibration() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 device_name: selectedDevice,
-                start_date: '2024-06-01',
-                end_date: '2024-07-31',
+                start_date: '2025-06-01',
+                end_date: '2025-07-31',
                 pollutant: 'pm25'
             })
         });
