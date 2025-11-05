@@ -36,6 +36,50 @@ const BOX_COLORS = {
     pm10: '#ffb703'
 };
 
+// Helpers para normalizar datos de sensores y RMCAB
+function coalesceValue(source, keys) {
+    if (!source) {
+        return null;
+    }
+    for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+            const value = source[key];
+            if (value !== null && value !== undefined) {
+                return value;
+            }
+        }
+    }
+    return null;
+}
+
+function toNumeric(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function normalizeDataset(rawData, deviceName = null) {
+    if (!Array.isArray(rawData)) {
+        return [];
+    }
+
+    return rawData
+        .map(entry => {
+            const datetimeValue = coalesceValue(entry, ['datetime', 'timestamp', 'fecha', 'date', 'time']);
+            return {
+                ...entry,
+                datetime: datetimeValue ? String(datetimeValue) : null,
+                pm25: toNumeric(coalesceValue(entry, ['pm25', 'pm25_sensor', 'pm25_ref', 'pm2_5', 'pm25_raw'])),
+                pm10: toNumeric(coalesceValue(entry, ['pm10', 'pm10_sensor', 'pm10_ref', 'pm10_raw'])),
+                temperature: toNumeric(coalesceValue(entry, ['temperature', 'temp', 'temperature_c', 'temperature_celsius'])),
+                rh: toNumeric(coalesceValue(entry, ['rh', 'relative_humidity', 'humidity', 'humidity_relative']))
+            };
+        })
+        .filter(entry => entry.datetime);
+}
+
 // Elementos del DOM - inicializados después de DOMContentLoaded
 let btnLoadDevice, btnStartCalibration, btnCalibrateAll, loadingOverlay, loadingMessage;
 let dataSection, calibrationSection, quickViewButtons, multiSensorSection, comparisonSection;
@@ -77,7 +121,45 @@ document.addEventListener('DOMContentLoaded', () => {
         multiCalibrationBtn.addEventListener('click', runMultipleCalibration);
         console.log('✅ Botón calibración múltiple conectado');
     }
-    
+
+    const btnPrediction = document.getElementById('btnPrediction');
+    if (btnPrediction) {
+        btnPrediction.addEventListener('click', showPredictionSection);
+        console.log('✅ Botón predicción conectado');
+    }
+
+    const btnRunPrediction = document.getElementById('btnRunPrediction');
+    if (btnRunPrediction) {
+        btnRunPrediction.addEventListener('click', runPrediction);
+        console.log('✅ Botón ejecutar predicción conectado');
+    }
+
+    const btnRunManualPrediction = document.getElementById('btnRunManualPrediction');
+    if (btnRunManualPrediction) {
+        btnRunManualPrediction.addEventListener('click', runManualPrediction);
+        console.log('✅ Botón predicción manual conectado');
+    }
+
+    const btnCancelManual = document.getElementById('btnCancelManual');
+    if (btnCancelManual) {
+        btnCancelManual.addEventListener('click', hideManualInputSection);
+        console.log('✅ Botón cancelar manual conectado');
+    }
+
+    // Event listeners para fechas sugeridas
+    const suggestedDateButtons = document.querySelectorAll('.suggested-date');
+    suggestedDateButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const dateValue = this.getAttribute('data-date');
+            const predictionDateInput = document.getElementById('predictionDate');
+            if (predictionDateInput) {
+                predictionDateInput.value = dateValue;
+                showAlert(`📅 Fecha seleccionada: ${dateValue}`, 'info');
+            }
+        });
+    });
+    console.log(`✅ ${suggestedDateButtons.length} botones de fechas sugeridas conectados`);
+
     if (btnLoadDevice) btnLoadDevice.addEventListener('click', () => loadDeviceData());
     if (btnStartCalibration) btnStartCalibration.addEventListener('click', runCalibration);
     if (btnCalibrateAll) btnCalibrateAll.addEventListener('click', runMultipleCalibration);
@@ -188,9 +270,10 @@ async function loadDeviceData(deviceName = null) {
 
     try {
         const result = await getDeviceData(targetDevice);
+        const normalizedData = result.normalizedData || normalizeDataset(result.data, targetDevice);
 
-        currentData = result.data;
-        const recordCount = result.records ?? (Array.isArray(result.data) ? result.data.length : 0);
+        currentData = normalizedData;
+        const recordCount = result.records ?? (Array.isArray(normalizedData) ? normalizedData.length : 0);
 
         showAlert(`Datos cargados: ${recordCount} registros`, "success");
 
@@ -198,7 +281,7 @@ async function loadDeviceData(deviceName = null) {
         document.getElementById("selectedDeviceName").textContent = friendlyName;
         showSingleSensorView();
 
-        await generateDataVisualizations(result.data, friendlyName);
+        generateDataVisualizations(targetDevice, normalizedData, friendlyName);
 
         dataSection.scrollIntoView({ behavior: "smooth" });
     } catch (error) {
@@ -265,6 +348,9 @@ async function getDeviceData(deviceName, forceRefresh = false) {
         throw new Error(result.error || 'No se pudo obtener la informacion solicitada');
     }
 
+    const normalizedData = normalizeDataset(result.data, deviceName);
+    result.normalizedData = normalizedData;
+
     deviceDataCache[deviceName] = result;
     return result;
 }
@@ -284,13 +370,15 @@ function showSingleSensorView() {
 /**
  * Genera visualizaciones de datos
  */
-async function generateDataVisualizations(data, deviceLabel = null) {
+function generateDataVisualizations(deviceName, data, deviceLabel = null) {
+    const normalized = Array.isArray(data) ? data : [];
+
     // Calcular métricas resumen
-    displayMetrics(data);
+    displayMetrics(normalized);
 
     // Generar gráficos
-    createTimeSeriesPlot(data, deviceLabel);
-    createBoxPlots(data, deviceLabel);
+    createTimeSeriesPlot(normalized, deviceLabel);
+    createBoxPlots(normalized, deviceLabel);
 }
 
 /**
@@ -388,7 +476,8 @@ async function showComparisonView() {
         for (const deviceName of DEVICE_ORDER) {
             try {
                 const result = await getDeviceData(deviceName);
-                datasets[deviceName] = result.data || [];
+                const normalized = result.normalizedData || normalizeDataset(result.data, deviceName);
+                datasets[deviceName] = normalized;
             } catch (loadError) {
                 console.error(`Error cargando ${deviceName}:`, loadError);
                 datasets[deviceName] = [];
@@ -706,6 +795,12 @@ async function runMultipleCalibration() {
 
         calibrationSection.style.display = 'block';
         calibrationSection.scrollIntoView({ behavior: 'smooth' });
+
+        // Habilitar botón de predicción después de calibración exitosa
+        const btnPrediction = document.getElementById('btnPrediction');
+        if (btnPrediction) {
+            btnPrediction.disabled = false;
+        }
 
         showAlert(`✅ Calibración completada para ${result.devices_calibrated}/${result.total_devices} sensores`, 'success');
     } catch (error) {
@@ -1494,6 +1589,401 @@ function renderDeviceMultiPollutantGraphs(deviceName, result) {
             `;
         }
     });
+}
+
+/**
+ * Muestra la sección de predicción
+ */
+function showPredictionSection() {
+    const predictionSection = document.getElementById('predictionSection');
+    if (predictionSection) {
+        predictionSection.style.display = 'block';
+        predictionSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+/**
+ * Muestra la sección de entrada manual
+ */
+function showManualInputSection() {
+    const manualInputSection = document.getElementById('manualInputSection');
+    const pollutantSelect = document.getElementById('predictionPollutant');
+    const pollutantLabel = document.getElementById('manualPollutantLabel');
+
+    if (manualInputSection) {
+        // Actualizar label según contaminante seleccionado
+        if (pollutantLabel && pollutantSelect) {
+            const pollutant = pollutantSelect.value.toUpperCase();
+            pollutantLabel.textContent = `${pollutant} del Sensor (µg/m³)`;
+        }
+
+        manualInputSection.style.display = 'block';
+        manualInputSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+/**
+ * Oculta la sección de entrada manual
+ */
+function hideManualInputSection() {
+    const manualInputSection = document.getElementById('manualInputSection');
+    if (manualInputSection) {
+        manualInputSection.style.display = 'none';
+    }
+}
+
+/**
+ * Ejecuta predicción con modelo calibrado (intenta con datos reales primero)
+ */
+async function runPrediction(useManualValues = false) {
+    const deviceSelect = document.getElementById('predictionDevice');
+    const dateInput = document.getElementById('predictionDate');
+    const pollutantSelect = document.getElementById('predictionPollutant');
+
+    const device_name = deviceSelect.value;
+    const target_date = dateInput.value;
+    const pollutant = pollutantSelect.value;
+
+    if (!device_name) {
+        showAlert('Por favor selecciona un sensor', 'warning');
+        return;
+    }
+
+    if (!target_date) {
+        showAlert('Por favor selecciona una fecha', 'warning');
+        return;
+    }
+
+    showLoading('Generando predicción...');
+
+    try {
+        const payload = {
+            device_name: device_name,
+            pollutant: pollutant,
+            target_date: target_date,
+            period: '2025',
+            station_code: 6
+        };
+
+        const response = await fetch('/api/predict-with-calibration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            // Si el error sugiere usar modo manual, mostrar campos
+            if (result.suggestion === 'use_manual_mode') {
+                hideLoading();
+                showManualInputSection();
+                showAlert(result.message, 'warning');
+                return;
+            }
+            throw new Error(result.error || 'Error en la predicción');
+        }
+
+        console.log('Resultado de predicción:', result);
+
+        // Ocultar campos manuales si estaban visibles
+        hideManualInputSection();
+
+        displayPredictionResults(result);
+
+    } catch (error) {
+        showAlert(`❌ Error en predicción: ${error.message}`, 'danger');
+        console.error(error);
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Ejecuta predicción con valores manuales
+ */
+async function runManualPrediction() {
+    const deviceSelect = document.getElementById('predictionDevice');
+    const dateInput = document.getElementById('predictionDate');
+    const pollutantSelect = document.getElementById('predictionPollutant');
+
+    const manualPMValue = document.getElementById('manualPMValue');
+    const manualTemperature = document.getElementById('manualTemperature');
+    const manualRH = document.getElementById('manualRH');
+
+    const device_name = deviceSelect.value;
+    const target_date = dateInput.value;
+    const pollutant = pollutantSelect.value;
+
+    if (!device_name || !target_date) {
+        showAlert('Por favor completa todos los campos', 'warning');
+        return;
+    }
+
+    // Validar valores manuales
+    const pm_value = parseFloat(manualPMValue.value);
+    const temp_value = parseFloat(manualTemperature.value);
+    const rh_value = parseFloat(manualRH.value);
+
+    if (isNaN(pm_value) || isNaN(temp_value) || isNaN(rh_value)) {
+        showAlert('Por favor ingresa valores numéricos válidos', 'warning');
+        return;
+    }
+
+    showLoading('Generando predicción con valores manuales...');
+
+    try {
+        const payload = {
+            device_name: device_name,
+            pollutant: pollutant,
+            target_date: target_date,
+            period: '2025',
+            station_code: 6,
+            manual_values: {
+                [`${pollutant}_sensor`]: pm_value,
+                temperature: temp_value,
+                rh: rh_value
+            }
+        };
+
+        console.log('Enviando predicción manual:', payload);
+
+        const response = await fetch('/api/predict-with-calibration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Error en la predicción');
+        }
+
+        console.log('Resultado de predicción manual:', result);
+
+        hideManualInputSection();
+        displayPredictionResults(result);
+
+    } catch (error) {
+        showAlert(`❌ Error en predicción manual: ${error.message}`, 'danger');
+        console.error(error);
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Muestra los resultados de predicción en la UI
+ */
+function displayPredictionResults(result) {
+    const predictionResults = document.getElementById('predictionResults');
+    const predictionMetrics = document.getElementById('predictionMetrics');
+    const predictionAnalysis = document.getElementById('predictionAnalysis');
+    const descriptiveStatsTable = document.getElementById('descriptiveStatsTable');
+    const improvementSummary = document.getElementById('improvementSummary');
+    const predictionInterpretation = document.getElementById('predictionInterpretation');
+    const predictionPlot = document.getElementById('predictionPlot');
+    const scatterPlotContainer = document.getElementById('scatterPlotContainer');
+    const predictionScatterPlot = document.getElementById('predictionScatterPlot');
+
+    const device_name = result.device_name;
+    const pollutant = result.pollutant;
+    const mode = result.mode || 'real_data';
+
+    // Mostrar métricas de error
+    if (result.error_stats) {
+        predictionMetrics.innerHTML = `
+            <div class="metric-card">
+                <h6>RMSE Calibrado</h6>
+                <p class="h4">${result.error_stats.rmse}</p>
+                <small class="text-muted">Sin calibrar: ${result.error_stats.rmse_raw}</small>
+            </div>
+            <div class="metric-card">
+                <h6>MAE Calibrado</h6>
+                <p class="h4">${result.error_stats.mae}</p>
+                <small class="text-muted">Sin calibrar: ${result.error_stats.mae_raw}</small>
+            </div>
+            <div class="metric-card">
+                <h6>R² Calibrado</h6>
+                <p class="h4">${result.error_stats.r2}</p>
+                <small class="text-muted">Sin calibrar: ${result.error_stats.r2_raw}</small>
+            </div>
+            <div class="metric-card">
+                <h6>Mejora RMSE</h6>
+                <p class="h4 text-success">${result.error_stats.rmse_improvement_pct}%</p>
+                <small class="text-muted">Reducción de error</small>
+            </div>
+            <div class="metric-card">
+                <h6>Mejora MAE</h6>
+                <p class="h4 text-success">${result.error_stats.mae_improvement_pct}%</p>
+                <small class="text-muted">Reducción de error</small>
+            </div>
+        `;
+
+        // Análisis descriptivo
+        const stats = result.descriptive_stats;
+        descriptiveStatsTable.innerHTML = `
+            <tr><th colspan="3" class="table-light"><strong>Sensor Raw</strong></th></tr>
+            <tr><td>Media:</td><td>${stats.sensor_raw.mean} µg/m³</td><td>Desv. Est: ${stats.sensor_raw.std}</td></tr>
+            <tr><td>Mediana:</td><td>${stats.sensor_raw.median} µg/m³</td><td>Rango: ${stats.sensor_raw.min} - ${stats.sensor_raw.max}</td></tr>
+
+            <tr><th colspan="3" class="table-light mt-2"><strong>Calibrado</strong></th></tr>
+            <tr><td>Media:</td><td>${stats.predicted.mean} µg/m³</td><td>Desv. Est: ${stats.predicted.std}</td></tr>
+            <tr><td>Mediana:</td><td>${stats.predicted.median} µg/m³</td><td>Rango: ${stats.predicted.min} - ${stats.predicted.max}</td></tr>
+
+            ${stats.rmcab ? `
+            <tr><th colspan="3" class="table-light mt-2"><strong>RMCAB Referencia</strong></th></tr>
+            <tr><td>Media:</td><td>${stats.rmcab.mean} µg/m³</td><td>Desv. Est: ${stats.rmcab.std}</td></tr>
+            <tr><td>Mediana:</td><td>${stats.rmcab.median} µg/m³</td><td>Rango: ${stats.rmcab.min} - ${stats.rmcab.max}</td></tr>
+            ` : ''}
+        `;
+
+        improvementSummary.innerHTML = `
+            <div class="alert alert-success mb-0">
+                <h6><i class="bi bi-check-circle-fill"></i> Resumen de Mejora</h6>
+                <ul class="mb-0">
+                    <li><strong>RMSE:</strong> ${result.error_stats.rmse_raw} → ${result.error_stats.rmse} (${result.error_stats.rmse_improvement_pct}% mejor)</li>
+                    <li><strong>MAE:</strong> ${result.error_stats.mae_raw} → ${result.error_stats.mae} (${result.error_stats.mae_improvement_pct}% mejor)</li>
+                    <li><strong>R²:</strong> ${result.error_stats.r2_raw} → ${result.error_stats.r2}</li>
+                    <li><strong>Comparaciones válidas:</strong> ${result.error_stats.comparisons_count} de ${result.records_count} registros</li>
+                </ul>
+            </div>
+        `;
+
+        predictionAnalysis.style.display = 'block';
+
+        // Interpretación de resultados
+        let interpretation = `<h6><i class="bi bi-lightbulb-fill"></i> Interpretación de Resultados</h6>`;
+        const r2 = result.error_stats.r2;
+        const improvement = result.error_stats.rmse_improvement_pct;
+
+        if (r2 >= 0.9 && improvement >= 30) {
+            interpretation += `<p><strong class="text-success">✓ Excelente calibración:</strong> El modelo calibrado tiene un R² de ${r2}, lo que indica un ajuste muy bueno a los datos de referencia RMCAB. La mejora de ${improvement}% en RMSE demuestra que la calibración redujo significativamente el error del sensor.</p>`;
+        } else if (r2 >= 0.7 && improvement >= 20) {
+            interpretation += `<p><strong class="text-info">→ Buena calibración:</strong> El R² de ${r2} indica un buen ajuste, y la mejora de ${improvement}% en RMSE muestra que la calibración es efectiva para reducir errores.</p>`;
+        } else if (r2 >= 0.5 && improvement >= 10) {
+            interpretation += `<p><strong class="text-warning">⚠ Calibración moderada:</strong> El R² de ${r2} sugiere un ajuste aceptable, con mejora de ${improvement}% en RMSE. Considera revisar las features utilizadas o el método de calibración.</p>`;
+        } else {
+            interpretation += `<p><strong class="text-danger">✗ Calibración limitada:</strong> El R² de ${r2} y la mejora de ${improvement}% indican que la calibración tuvo impacto limitado. Revisa la calidad de los datos y el modelo utilizado.</p>`;
+        }
+
+        interpretation += `<p><strong>Modelo utilizado:</strong> ${result.model_info.model_name}</p>`;
+        interpretation += `<p><strong>Error promedio:</strong> ${result.error_stats.mean_error} µg/m³ (rango: ${result.error_stats.min_error} - ${result.error_stats.max_error})</p>`;
+
+        predictionInterpretation.innerHTML = interpretation;
+        predictionInterpretation.style.display = 'block';
+
+        // Crear gráfico de dispersión
+        const validPredictions = result.predictions.filter(p => p.rmcab_reference !== null);
+        if (validPredictions.length > 0) {
+            const rmcabVals = validPredictions.map(p => p.rmcab_reference);
+            const predictedVals = validPredictions.map(p => p.predicted);
+            const sensorRawVals = validPredictions.map(p => p.sensor_raw);
+
+            const scatterTraces = [
+                {
+                    x: rmcabVals,
+                    y: sensorRawVals,
+                    mode: 'markers',
+                    name: 'Sensor Raw',
+                    marker: { color: '#83c5be', size: 8, opacity: 0.6 }
+                },
+                {
+                    x: rmcabVals,
+                    y: predictedVals,
+                    mode: 'markers',
+                    name: 'Calibrado',
+                    marker: { color: '#006d77', size: 8, opacity: 0.8 }
+                },
+                {
+                    x: rmcabVals,
+                    y: rmcabVals,
+                    mode: 'lines',
+                    name: 'Línea 1:1',
+                    line: { color: '#d62828', dash: 'dash', width: 2 }
+                }
+            ];
+
+            const scatterLayout = {
+                xaxis: { title: `RMCAB Referencia (µg/m³)` },
+                yaxis: { title: `Predicción (µg/m³)` },
+                hovermode: 'closest',
+                showlegend: true
+            };
+
+            Plotly.newPlot(predictionScatterPlot, scatterTraces, scatterLayout, { responsive: true });
+            scatterPlotContainer.style.display = 'block';
+        }
+
+    } else {
+        predictionMetrics.innerHTML = `
+            <div class="alert alert-warning">
+                <strong><i class="bi bi-exclamation-triangle"></i> No hay datos de RMCAB disponibles para comparación en esta fecha.</strong>
+                <p class="mb-0 mt-2">Prueba con una de las fechas sugeridas arriba para ver la comparación completa.</p>
+            </div>
+        `;
+        predictionAnalysis.style.display = 'none';
+        predictionInterpretation.style.display = 'none';
+        scatterPlotContainer.style.display = 'none';
+    }
+
+    // Crear gráfico de serie de tiempo
+    const datetimes = result.predictions.map(p => p.datetime);
+    const sensorRaw = result.predictions.map(p => p.sensor_raw);
+    const predicted = result.predictions.map(p => p.predicted);
+    const rmcabReference = result.predictions.map(p => p.rmcab_reference || null);
+
+    const traces = [
+        {
+            x: datetimes,
+            y: sensorRaw,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: `${device_name} Raw ${mode === 'manual' ? '(Manual)' : ''}`,
+            line: { color: '#83c5be', width: 2 },
+            marker: { size: 4 }
+        },
+        {
+            x: datetimes,
+            y: predicted,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: `${device_name} Calibrado (Predicción)`,
+            line: { color: '#006d77', width: 2, dash: 'dot' },
+            marker: { size: 6 }
+        }
+    ];
+
+    if (result.rmcab_available) {
+        traces.push({
+            x: datetimes,
+            y: rmcabReference,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'RMCAB Referencia',
+            line: { color: '#d62828', width: 2 },
+            marker: { size: 5 }
+        });
+    }
+
+    const modeLabel = mode === 'manual' ? ' [Valores Manuales]' : '';
+    const layout = {
+        title: `Predicción ${pollutant.toUpperCase()} - ${device_name} (${result.target_date})${modeLabel}`,
+        xaxis: { title: 'Hora' },
+        yaxis: { title: `${pollutant.toUpperCase()} (µg/m³)` },
+        hovermode: 'x unified',
+        showlegend: true,
+        legend: { x: 0, y: 1 }
+    };
+
+    Plotly.newPlot(predictionPlot, traces, layout, { responsive: true });
+
+    predictionResults.style.display = 'block';
+    predictionResults.scrollIntoView({ behavior: 'smooth' });
+
+    const modeMsg = mode === 'manual' ? ' (con valores manuales)' : '';
+    showAlert(`✅ Predicción completada${modeMsg}: ${result.records_count} registros`, 'success');
 }
 
 /**

@@ -119,6 +119,9 @@
             <button class="btn btn-primary btn-lg" id="multipleCalibrationBtn">
                 <i class="bi bi-cpu-fill"></i> Calibrar Todos (PM2.5 y PM10)
             </button>
+            <button class="btn btn-warning btn-sm" id="btnPrediction" disabled>
+                <i class="bi bi-graph-up-arrow"></i> Predicción con Modelo
+            </button>
         </div>
     </div>
 </section>
@@ -227,6 +230,144 @@
         <!-- Contenido de las pestañas -->
         <div class="tab-content" id="calibrationDeviceTabContent">
             <!-- El contenido se generará dinámicamente -->
+        </div>
+    </div>
+</section>
+
+<!-- Sección de Predicción con Modelo -->
+<section class="section bg-light" id="predictionSection" style="display: none;">
+    <div class="container">
+        <h3 class="mb-4">
+            <i class="bi bi-graph-up-arrow"></i>
+            Predicción con Modelo Calibrado
+        </h3>
+
+        <div class="alert alert-info">
+            <h5 class="mb-2">
+                <i class="bi bi-info-circle-fill"></i>
+                ¿Qué es esto?
+            </h5>
+            <p class="mb-0">
+                Esta herramienta te permite seleccionar una fecha específica y un sensor para realizar predicciones
+                usando el modelo calibrado. El sistema comparará la predicción con los valores reales de RMCAB.
+            </p>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Sensor</label>
+                <select class="form-select" id="predictionDevice">
+                    <option value="">Selecciona un sensor...</option>
+                    <option value="Aire2">Aire2</option>
+                    <option value="Aire4">Aire4</option>
+                    <option value="Aire5">Aire5</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Fecha</label>
+                <input type="date" class="form-control" id="predictionDate"
+                       min="2025-01-01" max="2025-12-31" value="2025-06-15">
+                <small class="text-muted">Cualquier fecha (no requiere datos reales)</small>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Contaminante</label>
+                <select class="form-select" id="predictionPollutant">
+                    <option value="pm25">PM2.5</option>
+                    <option value="pm10">PM10</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" id="btnRunPrediction">
+                    <i class="bi bi-play-fill"></i> Predecir
+                </button>
+            </div>
+        </div>
+
+        <!-- Fechas Sugeridas -->
+        <div class="alert alert-info mt-3">
+            <h6 class="mb-2"><i class="bi bi-calendar-check"></i> Fechas sugeridas con datos RMCAB disponibles:</h6>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-outline-info suggested-date" data-date="2025-06-15">15 Jun 2025</button>
+                <button class="btn btn-sm btn-outline-info suggested-date" data-date="2025-06-20">20 Jun 2025</button>
+                <button class="btn btn-sm btn-outline-info suggested-date" data-date="2025-07-01">01 Jul 2025</button>
+                <button class="btn btn-sm btn-outline-info suggested-date" data-date="2025-07-10">10 Jul 2025</button>
+                <button class="btn btn-sm btn-outline-info suggested-date" data-date="2025-07-20">20 Jul 2025</button>
+            </div>
+            <small class="text-muted d-block mt-2">Haz clic en una fecha para seleccionarla automáticamente</small>
+        </div>
+
+        <!-- Campos de Entrada Manual (ocultos inicialmente) -->
+        <div id="manualInputSection" style="display: none;" class="mt-3">
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <strong>No hay datos reales disponibles para esta fecha.</strong>
+                <br>Ingresa valores estimados para realizar la predicción:
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" id="manualPollutantLabel">PM del Sensor (µg/m³)</label>
+                    <input type="number" class="form-control" id="manualPMValue"
+                           placeholder="Ej: 15.5" step="0.1" min="0" max="500" value="15.0">
+                    <small class="text-muted">Valor típico en Bogotá: 10-30 µg/m³</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Temperatura (°C)</label>
+                    <input type="number" class="form-control" id="manualTemperature"
+                           placeholder="Ej: 14.0" step="0.1" min="-10" max="40" value="14.0">
+                    <small class="text-muted">Promedio Bogotá: 8-20 °C</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Humedad Relativa (%)</label>
+                    <input type="number" class="form-control" id="manualRH"
+                           placeholder="Ej: 70.0" step="0.1" min="0" max="100" value="70.0">
+                    <small class="text-muted">Promedio Bogotá: 60-85%</small>
+                </div>
+            </div>
+            <div class="mt-2">
+                <button class="btn btn-success" id="btnRunManualPrediction">
+                    <i class="bi bi-calculator"></i> Predecir con Valores Manuales
+                </button>
+                <button class="btn btn-secondary" id="btnCancelManual">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+            </div>
+        </div>
+
+        <!-- Resultados de Predicción -->
+        <div id="predictionResults" style="display: none;" class="mt-4">
+            <div class="plot-container">
+                <h5>Resultados de Predicción</h5>
+
+                <!-- Métricas de Error -->
+                <div id="predictionMetrics" class="metrics-grid mb-3"></div>
+
+                <!-- Análisis Descriptivo -->
+                <div id="predictionAnalysis" class="alert alert-light mb-3" style="display: none;">
+                    <h6><i class="bi bi-bar-chart-line"></i> Análisis Descriptivo</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless">
+                                <tbody id="descriptiveStatsTable"></tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <div id="improvementSummary"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interpretación -->
+                <div id="predictionInterpretation" class="alert alert-success mb-3" style="display: none;"></div>
+
+                <!-- Gráfico Serie de Tiempo -->
+                <div id="predictionPlot" style="min-height: 400px;"></div>
+
+                <!-- Gráfico de Dispersión -->
+                <div id="scatterPlotContainer" style="display: none;" class="mt-3">
+                    <h6>Dispersión: Predicción vs RMCAB</h6>
+                    <div id="predictionScatterPlot" style="min-height: 350px;"></div>
+                </div>
+            </div>
         </div>
     </div>
 </section>

@@ -1,5 +1,5 @@
 /**
- * JavaScript para Visualización Junio-Julio 2024
+ * JavaScript para Visualización 2024
  */
 
 let selectedDevice = null;
@@ -9,20 +9,20 @@ let calibrationResults = null;
 let activeViewMode = 'single';
 
 const DATE_RANGE = {
-    start: '2025-06-01',
-    end: '2025-07-31'
+    start: '2024-01-01',
+    end: '2024-12-31'
 };
 
-const POLLUTANTS = ['pm25', 'pm10'];  // Agregado PM10
+const POLLUTANTS = ['pm25', 'pm10'];
 
 const DEVICE_CONFIG = {
     Aire2: { type: 'sensor', label: 'Sensor Aire2' },
     Aire4: { type: 'sensor', label: 'Sensor Aire4' },
     Aire5: { type: 'sensor', label: 'Sensor Aire5' },
-    RMCAB_LasFer: { type: 'rmcab', label: 'RMCAB Las Ferias', station: 6 }
+    RMCAB_MinAmb: { type: 'rmcab', label: 'RMCAB MinAmbiente', station: 17 }
 };
 
-const DEVICE_ORDER = ['Aire2', 'Aire4', 'Aire5', 'RMCAB_LasFer'];
+const DEVICE_ORDER = ['Aire2', 'Aire4', 'Aire5', 'RMCAB_MinAmb'];
 const deviceDataCache = {};
 let currentFriendlyName = '';
 
@@ -42,7 +42,7 @@ let dataSection, calibrationSection, quickViewButtons, multiSensorSection, compa
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Inicializando visualización junio-julio...');
+    console.log('🚀 Inicializando visualización 2024...');
     
     // Obtener elementos del DOM
     btnLoadDevice = document.getElementById('btnLoadDevice');
@@ -77,7 +77,31 @@ document.addEventListener('DOMContentLoaded', () => {
         multiCalibrationBtn.addEventListener('click', runMultipleCalibration);
         console.log('✅ Botón calibración múltiple conectado');
     }
-    
+
+    const btnPrediction = document.getElementById('btnPrediction');
+    if (btnPrediction) {
+        btnPrediction.addEventListener('click', showPredictionSection);
+        console.log('✅ Botón predicción conectado');
+    }
+
+    const btnRunPrediction = document.getElementById('btnRunPrediction');
+    if (btnRunPrediction) {
+        btnRunPrediction.addEventListener('click', runPrediction);
+        console.log('✅ Botón ejecutar predicción conectado');
+    }
+
+    const btnRunManualPrediction = document.getElementById('btnRunManualPrediction');
+    if (btnRunManualPrediction) {
+        btnRunManualPrediction.addEventListener('click', runManualPrediction);
+        console.log('✅ Botón predicción manual conectado');
+    }
+
+    const btnCancelManual = document.getElementById('btnCancelManual');
+    if (btnCancelManual) {
+        btnCancelManual.addEventListener('click', hideManualInputSection);
+        console.log('✅ Botón cancelar manual conectado');
+    }
+
     if (btnLoadDevice) btnLoadDevice.addEventListener('click', () => loadDeviceData());
     if (btnStartCalibration) btnStartCalibration.addEventListener('click', runCalibration);
     if (btnCalibrateAll) btnCalibrateAll.addEventListener('click', runMultipleCalibration);
@@ -334,7 +358,7 @@ function displayMetrics(data) {
         {
             icon: 'calendar-range',
             title: 'Periodo',
-            value: 'Jun-Jul 2025',
+            value: '2024',
             color: 'warning'
         }
     ];
@@ -706,6 +730,12 @@ async function runMultipleCalibration() {
 
         calibrationSection.style.display = 'block';
         calibrationSection.scrollIntoView({ behavior: 'smooth' });
+
+        // Habilitar botón de predicción después de calibración exitosa
+        const btnPrediction = document.getElementById('btnPrediction');
+        if (btnPrediction) {
+            btnPrediction.disabled = false;
+        }
 
         showAlert(`✅ Calibración completada para ${result.devices_calibrated}/${result.total_devices} sensores`, 'success');
     } catch (error) {
@@ -1494,6 +1524,290 @@ function renderDeviceMultiPollutantGraphs(deviceName, result) {
             `;
         }
     });
+}
+
+/**
+ * Muestra la sección de predicción
+ */
+function showPredictionSection() {
+    const predictionSection = document.getElementById('predictionSection');
+    if (predictionSection) {
+        predictionSection.style.display = 'block';
+        predictionSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+/**
+ * Muestra la sección de entrada manual
+ */
+function showManualInputSection() {
+    const manualInputSection = document.getElementById('manualInputSection');
+    const pollutantSelect = document.getElementById('predictionPollutant');
+    const pollutantLabel = document.getElementById('manualPollutantLabel');
+
+    if (manualInputSection) {
+        // Actualizar label según contaminante seleccionado
+        if (pollutantLabel && pollutantSelect) {
+            const pollutant = pollutantSelect.value.toUpperCase();
+            pollutantLabel.textContent = `${pollutant} del Sensor (µg/m³)`;
+        }
+
+        manualInputSection.style.display = 'block';
+        manualInputSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+/**
+ * Oculta la sección de entrada manual
+ */
+function hideManualInputSection() {
+    const manualInputSection = document.getElementById('manualInputSection');
+    if (manualInputSection) {
+        manualInputSection.style.display = 'none';
+    }
+}
+
+/**
+ * Ejecuta predicción con modelo calibrado (intenta con datos reales primero)
+ */
+async function runPrediction() {
+    const deviceSelect = document.getElementById('predictionDevice');
+    const dateInput = document.getElementById('predictionDate');
+    const pollutantSelect = document.getElementById('predictionPollutant');
+
+    const device_name = deviceSelect.value;
+    const target_date = dateInput.value;
+    const pollutant = pollutantSelect.value;
+
+    if (!device_name) {
+        showAlert('Por favor selecciona un sensor', 'warning');
+        return;
+    }
+
+    if (!target_date) {
+        showAlert('Por favor selecciona una fecha', 'warning');
+        return;
+    }
+
+    showLoading('Generando predicción...');
+
+    try {
+        const payload = {
+            device_name: device_name,
+            pollutant: pollutant,
+            target_date: target_date,
+            period: '2024',
+            station_code: 17  // MinAmbiente
+        };
+
+        const response = await fetch('/api/predict-with-calibration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            // Si el error sugiere usar modo manual, mostrar campos
+            if (result.suggestion === 'use_manual_mode') {
+                hideLoading();
+                showManualInputSection();
+                showAlert(result.message, 'warning');
+                return;
+            }
+            throw new Error(result.error || 'Error en la predicción');
+        }
+
+        console.log('Resultado de predicción:', result);
+
+        // Ocultar campos manuales si estaban visibles
+        hideManualInputSection();
+
+        displayPredictionResults(result);
+
+    } catch (error) {
+        showAlert(`❌ Error en predicción: ${error.message}`, 'danger');
+        console.error(error);
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Ejecuta predicción con valores manuales
+ */
+async function runManualPrediction() {
+    const deviceSelect = document.getElementById('predictionDevice');
+    const dateInput = document.getElementById('predictionDate');
+    const pollutantSelect = document.getElementById('predictionPollutant');
+
+    const manualPMValue = document.getElementById('manualPMValue');
+    const manualTemperature = document.getElementById('manualTemperature');
+    const manualRH = document.getElementById('manualRH');
+
+    const device_name = deviceSelect.value;
+    const target_date = dateInput.value;
+    const pollutant = pollutantSelect.value;
+
+    if (!device_name || !target_date) {
+        showAlert('Por favor completa todos los campos', 'warning');
+        return;
+    }
+
+    // Validar valores manuales
+    const pm_value = parseFloat(manualPMValue.value);
+    const temp_value = parseFloat(manualTemperature.value);
+    const rh_value = parseFloat(manualRH.value);
+
+    if (isNaN(pm_value) || isNaN(temp_value) || isNaN(rh_value)) {
+        showAlert('Por favor ingresa valores numéricos válidos', 'warning');
+        return;
+    }
+
+    showLoading('Generando predicción con valores manuales...');
+
+    try {
+        const payload = {
+            device_name: device_name,
+            pollutant: pollutant,
+            target_date: target_date,
+            period: '2024',
+            station_code: 17,  // MinAmbiente
+            manual_values: {
+                [`${pollutant}_sensor`]: pm_value,
+                temperature: temp_value,
+                rh: rh_value
+            }
+        };
+
+        console.log('Enviando predicción manual:', payload);
+
+        const response = await fetch('/api/predict-with-calibration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Error en la predicción');
+        }
+
+        console.log('Resultado de predicción manual:', result);
+
+        hideManualInputSection();
+        displayPredictionResults(result);
+
+    } catch (error) {
+        showAlert(`❌ Error en predicción manual: ${error.message}`, 'danger');
+        console.error(error);
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Muestra los resultados de predicción en la UI
+ */
+function displayPredictionResults(result) {
+    const predictionResults = document.getElementById('predictionResults');
+    const predictionMetrics = document.getElementById('predictionMetrics');
+    const predictionPlot = document.getElementById('predictionPlot');
+
+    const device_name = result.device_name;
+    const pollutant = result.pollutant;
+    const mode = result.mode || 'real_data';
+
+    // Mostrar métricas
+    if (result.error_stats) {
+        predictionMetrics.innerHTML = `
+            <div class="metric-card">
+                <h6>RMSE</h6>
+                <p class="h4">${result.error_stats.rmse}</p>
+            </div>
+            <div class="metric-card">
+                <h6>MAE</h6>
+                <p class="h4">${result.error_stats.mae}</p>
+            </div>
+            <div class="metric-card">
+                <h6>R²</h6>
+                <p class="h4">${result.error_stats.r2}</p>
+            </div>
+            <div class="metric-card">
+                <h6>Error Promedio</h6>
+                <p class="h4">${result.error_stats.mean_error}</p>
+            </div>
+            <div class="metric-card">
+                <h6>Comparaciones</h6>
+                <p class="h4">${result.error_stats.comparisons_count}</p>
+            </div>
+        `;
+    } else {
+        predictionMetrics.innerHTML = `
+            <div class="alert alert-warning">
+                No hay datos de RMCAB disponibles para comparación en esta fecha.
+            </div>
+        `;
+    }
+
+    // Crear gráfico de predicción
+    const datetimes = result.predictions.map(p => p.datetime);
+    const sensorRaw = result.predictions.map(p => p.sensor_raw);
+    const predicted = result.predictions.map(p => p.predicted);
+    const rmcabReference = result.predictions.map(p => p.rmcab_reference || null);
+
+    const traces = [
+        {
+            x: datetimes,
+            y: sensorRaw,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: `${device_name} Raw ${mode === 'manual' ? '(Manual)' : ''}`,
+            line: { color: '#83c5be', width: 2 },
+            marker: { size: 4 }
+        },
+        {
+            x: datetimes,
+            y: predicted,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: `${device_name} Calibrado (Predicción)`,
+            line: { color: '#006d77', width: 2, dash: 'dot' },
+            marker: { size: 6 }
+        }
+    ];
+
+    if (result.rmcab_available) {
+        traces.push({
+            x: datetimes,
+            y: rmcabReference,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'RMCAB Referencia',
+            line: { color: '#d62828', width: 2 },
+            marker: { size: 5 }
+        });
+    }
+
+    const modeLabel = mode === 'manual' ? ' [Valores Manuales]' : '';
+    const layout = {
+        title: `Predicción ${pollutant.toUpperCase()} - ${device_name} (${result.target_date})${modeLabel}`,
+        xaxis: { title: 'Hora' },
+        yaxis: { title: `${pollutant.toUpperCase()} (µg/m³)` },
+        hovermode: 'x unified',
+        showlegend: true,
+        legend: { x: 0, y: 1 }
+    };
+
+    Plotly.newPlot(predictionPlot, traces, layout, { responsive: true });
+
+    predictionResults.style.display = 'block';
+    predictionResults.scrollIntoView({ behavior: 'smooth' });
+
+    const modeMsg = mode === 'manual' ? ' (con valores manuales)' : '';
+    showAlert(`✅ Predicción completada${modeMsg}: ${result.records_count} registros`, 'success');
 }
 
 /**

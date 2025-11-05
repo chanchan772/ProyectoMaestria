@@ -10,6 +10,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.preprocessing import StandardScaler, RobustScaler
+import joblib
+import os
+from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -194,6 +197,9 @@ def evaluate_model(model, X_train, X_test, y_train, y_test, model_name, feature_
             result['intercept'] = round(float(model.intercept_), 6)
             if feature_names:
                 result['feature_names'] = list(feature_names)
+
+        # Guardar el modelo entrenado completo (necesario para modelos no lineales)
+        result['trained_model'] = model
 
         return result
 
@@ -548,7 +554,7 @@ def create_scatter_points(actual, predicted, max_points=400):
     return points
 
 
-def run_device_calibration(lowcost_df, rmcab_df, device_name, pollutants=('pm25', 'pm10'), test_size=0.25):
+def run_device_calibration(lowcost_df, rmcab_df, device_name, pollutants=('pm25', 'pm10'), test_size=0.25, period='2025'):
     summary = {
         'device': device_name,
         'pollutant_results': []
@@ -628,6 +634,18 @@ def run_device_calibration(lowcost_df, rmcab_df, device_name, pollutants=('pm25'
                 'points': create_scatter_points(actual_values, predicted_values)
             }
 
+        # Guardar el modelo automáticamente
+        if not calibration.get('error'):
+            print(f"\n💾 Guardando modelo para {device_name} - {pollutant}...")
+            save_result = save_calibration_models(calibration, device_name, pollutant, period)
+            if save_result.get('success'):
+                print(f"✅ Modelo guardado exitosamente")
+                entry['model_saved'] = True
+                entry['saved_model_path'] = save_result.get('metadata_path')
+            else:
+                print(f"⚠️ No se pudo guardar el modelo: {save_result.get('error')}")
+                entry['model_saved'] = False
+
         summary['pollutant_results'].append(entry)
 
     return summary
@@ -656,6 +674,179 @@ def apply_calibration(model, X, scaler=None):
             return model.predict(X)
     except Exception as e:
         print(f"Error aplicando calibración: {e}")
+        return None
+
+
+def save_calibration_models(calibration_results, device_name, pollutant, period='2025'):
+    """
+    Guarda los modelos calibrados en disco para uso posterior
+
+    Args:
+        calibration_results: Resultados de calibración con modelos
+        device_name: Nombre del dispositivo
+        pollutant: 'pm25' o 'pm10'
+        period: Identificador del período (2024 o 2025)
+
+    Returns:
+        dict: Información sobre los modelos guardados
+    """
+    try:
+        # Crear directorio para modelos si no existe
+        models_dir = os.path.join('models', period, device_name)
+        os.makedirs(models_dir, exist_ok=True)
+
+        saved_models = {}
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        # Obtener el mejor modelo de los resultados
+        results = calibration_results.get('results', [])
+        if not results:
+            return {'error': 'No hay modelos para guardar'}
+
+        best_model_result = next((r for r in results if r.get('is_best')), results[0])
+        model_name = best_model_result['model_name']
+
+        # Recrear y entrenar el mejor modelo
+        # (Nota: Idealmente deberíamos guardar el modelo ya entrenado desde train_and_evaluate_models)
+        # Por ahora, guardamos la metadata necesaria para recrearlo
+
+        model_info = {
+            'device_name': device_name,
+            'pollutant': pollutant,
+            'period': period,
+            'model_name': model_name,
+            'timestamp': timestamp,
+            'feature_names': calibration_results.get('feature_names', []),
+            'metrics': {
+                'r2': best_model_result.get('r2'),
+                'rmse': best_model_result.get('rmse'),
+                'mae': best_model_result.get('mae'),
+                'mape': best_model_result.get('mape')
+            }
+        }
+
+        # Guardar coeficientes si es modelo lineal
+        if 'coefficients' in best_model_result:
+            model_info['coefficients'] = best_model_result['coefficients']
+            model_info['intercept'] = best_model_result['intercept']
+
+        # Guardar el modelo completo entrenado (necesario para Random Forest, SVR, etc.)
+        trained_model = best_model_result.get('trained_model')
+        model_path = os.path.join(models_dir, f'{pollutant}_model.pkl')
+
+        if trained_model is not None:
+            joblib.dump(trained_model, model_path)
+            model_info['model_path'] = model_path
+            print(f"✅ Modelo completo guardado: {model_path}")
+
+        # Guardar metadata
+        metadata_path = os.path.join(models_dir, f'{pollutant}_model_metadata.pkl')
+        joblib.dump(model_info, metadata_path)
+
+        print(f"✅ Metadata guardada: {metadata_path}")
+
+        return {
+            'success': True,
+            'model_name': model_name,
+            'metadata_path': metadata_path,
+            'model_path': model_path if trained_model else None,
+            'device': device_name,
+            'pollutant': pollutant
+        }
+
+    except Exception as e:
+        print(f"Error guardando modelos: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'error': str(e)}
+
+
+def load_calibration_model(device_name, pollutant, period='2025'):
+    """
+    Carga un modelo calibrado desde disco
+
+    Args:
+        device_name: Nombre del dispositivo
+        pollutant: 'pm25' o 'pm10'
+        period: Identificador del período (2024 o 2025)
+
+    Returns:
+        dict: Información del modelo o None si no existe
+    """
+    try:
+        metadata_path = os.path.join('models', period, device_name, f'{pollutant}_model_metadata.pkl')
+
+        if not os.path.exists(metadata_path):
+            return None
+
+        model_info = joblib.load(metadata_path)
+
+        # Cargar el modelo completo si está disponible
+        model_path = os.path.join('models', period, device_name, f'{pollutant}_model.pkl')
+        if os.path.exists(model_path):
+            trained_model = joblib.load(model_path)
+            model_info['trained_model'] = trained_model
+            print(f"✅ Modelo completo cargado desde {model_path}")
+
+        return model_info
+
+    except Exception as e:
+        print(f"Error cargando modelo: {e}")
+        return None
+
+
+def predict_with_saved_model(model_info, sensor_data):
+    """
+    Realiza predicción usando un modelo guardado
+
+    Args:
+        model_info: Información del modelo cargado
+        sensor_data: DataFrame con datos del sensor (debe incluir las features necesarias)
+
+    Returns:
+        array: Predicciones calibradas
+    """
+    try:
+        if model_info is None or 'error' in model_info:
+            return None
+
+        feature_names = model_info.get('feature_names', [])
+
+        # Verificar que tenemos todas las features necesarias
+        missing_features = [f for f in feature_names if f not in sensor_data.columns]
+        if missing_features:
+            print(f"⚠️  Faltan features: {missing_features}")
+            return None
+
+        # Preparar features
+        X = sensor_data[feature_names].values
+
+        # PRIORIDAD 1: Usar el modelo completo entrenado (para Random Forest, SVR, etc.)
+        if 'trained_model' in model_info:
+            trained_model = model_info['trained_model']
+            print(f"✅ Usando modelo completo entrenado: {model_info.get('model_name')}")
+            predictions = trained_model.predict(X)
+            return predictions
+
+        # PRIORIDAD 2: Para modelos lineales, aplicar directamente la fórmula
+        elif 'coefficients' in model_info and 'intercept' in model_info:
+            coefficients = model_info['coefficients']
+            intercept = model_info['intercept']
+
+            print(f"✅ Usando fórmula lineal: y = {intercept:.4f} + Σ(coef_i × x_i)")
+
+            # Aplicar fórmula: y = intercept + sum(coef_i * x_i)
+            predictions = intercept + np.dot(X, coefficients)
+            return predictions
+
+        else:
+            print(f"❌ No se puede hacer predicción: falta modelo entrenado o coeficientes")
+            return None
+
+    except Exception as e:
+        print(f"Error en predicción: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 

@@ -92,14 +92,14 @@ def load_lowcost_data(start_date='2024-06-01', end_date='2024-07-31', devices=No
             df['received_at'] = pd.to_datetime(df['received_at']).dt.tz_localize(None)
             df = df.rename(columns={
                 'received_at': 'datetime',
-                'pm25_raw': 'pm25',
-                'pm10_raw': 'pm10'
+                'pm25_raw': 'pm25_sensor',  # Renombrar a pm25_sensor para consistencia con calibración
+                'pm10_raw': 'pm10_sensor'   # Renombrar a pm10_sensor para consistencia con calibración
             })
 
             # Resample a promedios horarios
             df_hourly = df.groupby(['device_name', pd.Grouper(key='datetime', freq='H')]).agg({
-                'pm25': 'mean',
-                'pm10': 'mean',
+                'pm25_sensor': 'mean',
+                'pm10_sensor': 'mean',
                 'temperature': 'mean',
                 'rh': 'mean'
             }).reset_index()
@@ -318,26 +318,26 @@ def load_rmcab_data(station_code=6, start_date='2024-06-01', end_date='2024-07-3
             if isinstance(col, str):
                 normalized = col.lower().replace(' ', '').replace('.', '').replace('μ', '')
                 if 'pm25' in normalized or 'pm2' in normalized:
-                    column_mapping[col] = 'pm25'
+                    column_mapping[col] = 'pm25_ref'  # Usar sufijo _ref para consistencia con calibración
                 elif 'pm10' in normalized:
-                    column_mapping[col] = 'pm10'
+                    column_mapping[col] = 'pm10_ref'  # Usar sufijo _ref para consistencia con calibración
 
         if column_mapping:
             print(f"   Renombrando columnas: {column_mapping}")
             pivot = pivot.rename(columns=column_mapping)
 
-        if 'pm25' not in pivot.columns:
-            print(f"   ⚠️  Agregando columna pm25 vacía")
-            pivot['pm25'] = None
-        if 'pm10' not in pivot.columns:
-            print(f"   ⚠️  Agregando columna pm10 vacía")
-            pivot['pm10'] = None
+        if 'pm25_ref' not in pivot.columns:
+            print(f"   ⚠️  Agregando columna pm25_ref vacía")
+            pivot['pm25_ref'] = None
+        if 'pm10_ref' not in pivot.columns:
+            print(f"   ⚠️  Agregando columna pm10_ref vacía")
+            pivot['pm10_ref'] = None
 
         pivot['station'] = f'RMCAB_{station_code}'
 
         print(f"   ✅ Datos finales: {len(pivot)} registros")
-        print(f"   PM2.5 no nulos: {pivot['pm25'].notna().sum()}")
-        print(f"   PM10 no nulos: {pivot['pm10'].notna().sum()}")
+        print(f"   PM2.5 no nulos: {pivot['pm25_ref'].notna().sum()}")
+        print(f"   PM10 no nulos: {pivot['pm10_ref'].notna().sum()}")
 
         return pivot.sort_values('datetime')
     except Exception as exc:
