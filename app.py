@@ -45,10 +45,15 @@ def acerca_de():
     """Página sobre el equipo y el proyecto"""
     return render_template('acerca_de.html')
 
-@app.route('/visualizacion')
-def visualizacion():
-    """Página de visualización de datos en tiempo real"""
-    return render_template('visualizacion.html')
+@app.route('/visualizacion/junio-julio')
+def visualizacion_junio_julio():
+    """Página de visualización Junio-Julio 2024"""
+    return render_template('visualizacion_junio_julio.html')
+
+@app.route('/visualizacion/2024')
+def visualizacion_2024():
+    """Página de visualización Periodo Completo 2024"""
+    return render_template('visualizacion_2024.html')
 
 # =======================
 # API ENDPOINTS
@@ -167,6 +172,59 @@ def api_visualize():
         return jsonify({
             'success': True,
             'plot': json.loads(fig_json)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/load-device-data', methods=['POST'])
+def api_load_device_data():
+    """Carga datos de un dispositivo específico"""
+    try:
+        device_name = request.json.get('device_name')
+        start_date = request.json.get('start_date', '2024-06-01')
+        end_date = request.json.get('end_date', '2024-07-31')
+
+        data = load_lowcost_data(start_date, end_date, [device_name])
+
+        if data is None or data.empty:
+            return jsonify({'error': f'No se encontraron datos para {device_name}'}), 404
+
+        data_json = data.to_json(orient='records', date_format='iso')
+        return jsonify({
+            'success': True,
+            'device': device_name,
+            'records': len(data),
+            'data': json.loads(data_json)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/calibrate-device', methods=['POST'])
+def api_calibrate_device():
+    """Ejecuta calibración para un dispositivo específico"""
+    try:
+        device_name = request.json.get('device_name')
+        start_date = request.json.get('start_date', '2024-06-01')
+        end_date = request.json.get('end_date', '2024-07-31')
+        pollutant = request.json.get('pollutant', 'pm25')
+
+        # Cargar datos del dispositivo
+        lowcost_data = load_lowcost_data(start_date, end_date, [device_name])
+
+        # Cargar datos de RMCAB
+        rmcab_data = load_rmcab_data(6, start_date, end_date)  # Las Ferias
+
+        if lowcost_data is None or rmcab_data is None:
+            return jsonify({'error': 'No se pudieron cargar los datos'}), 404
+
+        # Ejecutar calibración
+        results = train_and_evaluate_models(lowcost_data, rmcab_data, pollutant)
+
+        return jsonify({
+            'success': True,
+            'device': device_name,
+            'pollutant': pollutant,
+            'results': results
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

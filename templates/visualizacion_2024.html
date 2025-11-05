@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Visualización Junio-Julio 2024{% endblock %}
+
+{% block extra_css %}
+<style>
+    .device-card {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    .device-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .device-card.selected {
+        border-color: var(--primary-green);
+        background-color: #f0fdf4;
+    }
+    .plot-container {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+        margin-bottom: 2rem;
+    }
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+    .loading-overlay.active {
+        display: flex;
+    }
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 2rem 0;
+    }
+    .metric-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="text-center text-white">
+        <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status"></div>
+        <h4 class="mt-3" id="loadingMessage">Cargando datos...</h4>
+    </div>
+</div>
+
+<!-- Hero Section -->
+<section class="hero" style="padding: 3rem 0;">
+    <div class="container">
+        <h1>
+            <i class="bi bi-calendar-range"></i>
+            Visualización Junio-Julio 2024
+        </h1>
+        <p class="lead">
+            Análisis individual de sensores y calibración - Periodo: 1 junio - 31 julio 2024
+        </p>
+    </div>
+</section>
+
+<!-- Selección de Dispositivo -->
+<section class="section">
+    <div class="container">
+        <h3 class="mb-4">
+            <i class="bi bi-hdd-rack"></i>
+            Paso 1: Selecciona un Dispositivo
+        </h3>
+
+        <div class="row g-3" id="deviceSelector">
+            <!-- Sensores de Bajo Costo -->
+            <div class="col-md-4">
+                <div class="card device-card h-100" data-device="Aire2" data-type="sensor">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-cpu display-3 text-primary mb-3"></i>
+                        <h5 class="card-title">Sensor Aire2</h5>
+                        <p class="text-muted small">Sensor de Bajo Costo<br>PMS5003</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card device-card h-100" data-device="Aire4" data-type="sensor">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-cpu display-3 text-success mb-3"></i>
+                        <h5 class="card-title">Sensor Aire4</h5>
+                        <p class="text-muted small">Sensor de Bajo Costo<br>PMS5003</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card device-card h-100" data-device="Aire5" data-type="sensor">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-cpu display-3 text-info mb-3"></i>
+                        <h5 class="card-title">Sensor Aire5</h5>
+                        <p class="text-muted small">Sensor de Bajo Costo<br>PMS5003</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estaciones RMCAB -->
+            <div class="col-md-6">
+                <div class="card device-card h-100" data-device="RMCAB_LasFer" data-type="rmcab" data-station="6">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-building display-3 text-warning mb-3"></i>
+                        <h5 class="card-title">RMCAB - Las Ferias</h5>
+                        <p class="text-muted small">Estación de Referencia<br>Código: 6</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card device-card h-100" data-device="RMCAB_MinAmb" data-type="rmcab" data-station="9">
+                    <div class="card-body text-center p-4">
+                        <i class="bi bi-building display-3 text-danger mb-3"></i>
+                        <h5 class="card-title">RMCAB - Min Ambiente</h5>
+                        <p class="text-muted small">Estación de Referencia<br>Código: 9</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <button class="btn btn-primary-custom btn-lg" id="btnLoadDevice" disabled>
+                <i class="bi bi-download"></i> Cargar Datos del Dispositivo
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Visualización de Datos -->
+<section class="section bg-light" id="dataSection" style="display: none;">
+    <div class="container">
+        <h3 class="mb-4">
+            <i class="bi bi-graph-up"></i>
+            Paso 2: Visualización de Datos - <span id="selectedDeviceName"></span>
+        </h3>
+
+        <!-- Métricas Resumen -->
+        <div class="metrics-grid" id="metricsGrid"></div>
+
+        <!-- Gráficos -->
+        <div class="plot-container">
+            <h5>Serie de Tiempo - PM2.5 y PM10</h5>
+            <div id="timeseriesPlot"></div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="plot-container">
+                    <h5>Distribución PM2.5</h5>
+                    <div id="boxplotPM25"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="plot-container">
+                    <h5>Distribución PM10</h5>
+                    <div id="boxplotPM10"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <button class="btn btn-secondary-custom btn-lg" id="btnStartCalibration">
+                <i class="bi bi-cpu-fill"></i> Iniciar Calibración con Modelos ML
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Resultados de Calibración -->
+<section class="section" id="calibrationSection" style="display: none;">
+    <div class="container">
+        <h3 class="mb-4">
+            <i class="bi bi-bar-chart-line"></i>
+            Paso 3: Resultados de Calibración
+        </h3>
+
+        <!-- Resumen de Efectividad -->
+        <div class="alert alert-info">
+            <h5>
+                <i class="bi bi-info-circle-fill"></i>
+                Interpretación de Resultados
+            </h5>
+            <ul class="mb-0">
+                <li><strong>R²:</strong> Cercano a 1 es mejor (explica más varianza)</li>
+                <li><strong>RMSE y MAE:</strong> Más bajo es mejor (menor error)</li>
+                <li><strong>MAPE:</strong> Más bajo es mejor (menor error porcentual)</li>
+            </ul>
+        </div>
+
+        <!-- Tabla de Resultados -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Comparación de 5 Modelos de Calibración</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Modelo</th>
+                                <th>R²</th>
+                                <th>RMSE (µg/m³)</th>
+                                <th>MAE (µg/m³)</th>
+                                <th>MAPE (%)</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calibrationResultsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico Resumen de Efectividad -->
+        <div class="plot-container">
+            <h5>Resumen de Efectividad de Modelos</h5>
+            <div id="effectivenessPlot"></div>
+        </div>
+
+        <!-- Scatter Plots de cada Modelo -->
+        <h4 class="mt-5 mb-4">Diagramas de Dispersión por Modelo</h4>
+        <div class="row" id="scatterPlotsContainer"></div>
+
+        <!-- Mejor Modelo -->
+        <div class="alert alert-success mt-4" id="bestModelAlert"></div>
+    </div>
+</section>
+
+<!-- Comparación Antes/Después -->
+<section class="section bg-light" id="comparisonSection" style="display: none;">
+    <div class="container">
+        <h3 class="mb-4">
+            <i class="bi bi-arrow-left-right"></i>
+            Paso 4: Comparación Antes y Después de Calibración
+        </h3>
+
+        <div class="plot-container">
+            <div id="beforeAfterPlot"></div>
+        </div>
+
+        <div class="alert alert-success">
+            <h5><i class="bi bi-check-circle-fill"></i> Conclusión de Calibración</h5>
+            <p id="conclusionText"></p>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/visualizacion_junio_julio.js') }}"></script>
+{% endblock %}

@@ -54,10 +54,25 @@
                             <i class="bi bi-cpu-fill"></i> Modelos
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'visualizacion' %}active{% endif %}" href="{{ url_for('visualizacion') }}">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint in ['visualizacion_junio_julio', 'visualizacion_2024'] %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-graph-up"></i> Visualización
                         </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item {% if request.endpoint == 'visualizacion_junio_julio' %}active{% endif %}"
+                                   href="{{ url_for('visualizacion_junio_julio') }}">
+                                    <i class="bi bi-calendar-range"></i> Junio-Julio 2024
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {% if request.endpoint == 'visualizacion_2024' %}active{% endif %}"
+                                   href="{{ url_for('visualizacion_2024') }}">
+                                    <i class="bi bi-calendar3"></i> Periodo Completo 2024
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'definiciones' %}active{% endif %}" href="{{ url_for('definiciones') }}">

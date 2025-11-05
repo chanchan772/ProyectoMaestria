@@ -378,5 +378,252 @@ def create_comparison_plot(results_df):
     return fig
 
 
+def create_calibration_scatter(y_true, y_pred, model_name, pollutant='PM2.5'):
+    """
+    Crea scatter plot de calibración (real vs predicho)
+
+    Args:
+        y_true: Valores reales
+        y_pred: Valores predichos
+        model_name: Nombre del modelo
+        pollutant: Nombre del contaminante
+
+    Returns:
+        plotly.graph_objects.Figure
+    """
+    fig = go.Figure()
+
+    # Scatter plot
+    fig.add_trace(go.Scatter(
+        x=y_true,
+        y=y_pred,
+        mode='markers',
+        name='Predicciones',
+        marker=dict(
+            color=COLORS['primary_green'],
+            size=6,
+            opacity=0.6
+        ),
+        text=[f'Real: {r:.2f}<br>Pred: {p:.2f}' for r, p in zip(y_true, y_pred)],
+        hovertemplate='%{text}<extra></extra>'
+    ))
+
+    # Línea perfecta (y = x)
+    min_val = min(min(y_true), min(y_pred))
+    max_val = max(max(y_true), max(y_pred))
+
+    fig.add_trace(go.Scatter(
+        x=[min_val, max_val],
+        y=[min_val, max_val],
+        mode='lines',
+        name='Predicción Perfecta',
+        line=dict(color='red', dash='dash', width=2)
+    ))
+
+    # Calcular R²
+    from sklearn.metrics import r2_score
+    r2 = r2_score(y_true, y_pred)
+
+    fig.update_layout(
+        title=f'{model_name} - {pollutant}<br><sub>R² = {r2:.4f}</sub>',
+        xaxis_title=f'{pollutant} Real (µg/m³)',
+        yaxis_title=f'{pollutant} Predicho (µg/m³)',
+        template='plotly_white',
+        height=500,
+        showlegend=True
+    )
+
+    # Hacer cuadrado el gráfico
+    fig.update_xaxes(scaleanchor="y", scaleratio=1)
+
+    return fig
+
+
+def create_residuals_plot(y_true, y_pred, model_name):
+    """
+    Crea gráfico de residuales
+
+    Args:
+        y_true: Valores reales
+        y_pred: Valores predichos
+        model_name: Nombre del modelo
+
+    Returns:
+        plotly.graph_objects.Figure
+    """
+    residuals = y_true - y_pred
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=y_pred,
+        y=residuals,
+        mode='markers',
+        name='Residuales',
+        marker=dict(
+            color=COLORS['secondary_blue'],
+            size=6,
+            opacity=0.6
+        )
+    ))
+
+    # Línea en cero
+    fig.add_hline(y=0, line_dash="dash", line_color="red")
+
+    fig.update_layout(
+        title=f'Residuales - {model_name}',
+        xaxis_title='Valores Predichos (µg/m³)',
+        yaxis_title='Residuales (µg/m³)',
+        template='plotly_white',
+        height=400
+    )
+
+    return fig
+
+
+def create_before_after_comparison(df_original, df_calibrated, device_name, pollutant='pm25'):
+    """
+    Crea comparación antes/después de calibración
+
+    Args:
+        df_original: DataFrame con datos originales
+        df_calibrated: DataFrame con datos calibrados
+        device_name: Nombre del dispositivo
+        pollutant: Contaminante
+
+    Returns:
+        plotly.graph_objects.Figure
+    """
+    fig = go.Figure()
+
+    # Datos originales
+    fig.add_trace(go.Scatter(
+        x=df_original['datetime'],
+        y=df_original[f'{pollutant}_sensor'],
+        mode='lines',
+        name=f'{device_name} - Sin Calibrar',
+        line=dict(color='gray', width=1),
+        opacity=0.7
+    ))
+
+    # Datos calibrados
+    fig.add_trace(go.Scatter(
+        x=df_calibrated['datetime'],
+        y=df_calibrated[f'{pollutant}_calibrated'],
+        mode='lines',
+        name=f'{device_name} - Calibrado',
+        line=dict(color=COLORS['primary_green'], width=2)
+    ))
+
+    # Datos de referencia
+    fig.add_trace(go.Scatter(
+        x=df_calibrated['datetime'],
+        y=df_calibrated[f'{pollutant}_ref'],
+        mode='lines',
+        name='RMCAB (Referencia)',
+        line=dict(color='red', width=1.5, dash='dot')
+    ))
+
+    # Límites normativos
+    if pollutant in LIMITS:
+        fig.add_hline(
+            y=LIMITS[pollutant]['OMS_2021'],
+            line_dash="dash",
+            line_color="orange",
+            annotation_text="OMS 2021",
+            annotation_position="right"
+        )
+
+    fig.update_layout(
+        title=f'Comparación Antes/Después - {device_name}',
+        xaxis_title='Fecha y Hora',
+        yaxis_title=f'Concentración {pollutant.upper()} (µg/m³)',
+        hovermode='x unified',
+        template='plotly_white',
+        height=500,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+
+    return fig
+
+
+def create_model_effectiveness_summary(results_list):
+    """
+    Crea resumen visual de efectividad de modelos
+
+    Args:
+        results_list: Lista de resultados de calibración
+
+    Returns:
+        plotly.graph_objects.Figure
+    """
+    from plotly.subplots import make_subplots
+
+    # Convertir a DataFrame
+    df = pd.DataFrame(results_list)
+
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=(
+            'R² por Modelo (↑ mejor)',
+            'RMSE por Modelo (↓ mejor)',
+            'MAE por Modelo (↓ mejor)',
+            'MAPE por Modelo (↓ mejor)'
+        ),
+        specs=[[{"type": "bar"}, {"type": "bar"}],
+               [{"type": "bar"}, {"type": "bar"}]]
+    )
+
+    # Colores por modelo
+    colors = [COLORS['primary_green'], COLORS['secondary_blue'], COLORS['accent_teal'],
+              '#fbbf24', '#f87171']
+
+    # R²
+    fig.add_trace(
+        go.Bar(x=df['model_name'], y=df['r2'], marker_color=colors, name='R²',
+               text=df['r2'].round(4), textposition='outside'),
+        row=1, col=1
+    )
+
+    # RMSE
+    fig.add_trace(
+        go.Bar(x=df['model_name'], y=df['rmse'], marker_color=colors, name='RMSE',
+               text=df['rmse'].round(2), textposition='outside'),
+        row=1, col=2
+    )
+
+    # MAE
+    fig.add_trace(
+        go.Bar(x=df['model_name'], y=df['mae'], marker_color=colors, name='MAE',
+               text=df['mae'].round(2), textposition='outside'),
+        row=2, col=1
+    )
+
+    # MAPE
+    fig.add_trace(
+        go.Bar(x=df['model_name'], y=df['mape'], marker_color=colors, name='MAPE',
+               text=df['mape'].round(2), textposition='outside'),
+        row=2, col=2
+    )
+
+    fig.update_layout(
+        title_text="Efectividad de Modelos de Calibración",
+        showlegend=False,
+        height=800,
+        template='plotly_white'
+    )
+
+    # Actualizar ejes
+    fig.update_xaxes(tickangle=-45)
+
+    return fig
+
+
 if __name__ == '__main__':
     print("Módulo de visualización cargado correctamente")
