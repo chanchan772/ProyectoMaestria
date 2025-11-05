@@ -111,10 +111,13 @@
         </div>
         <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
             <button class="btn btn-outline-primary btn-sm" id="btnLoadDevice" disabled>
-                <i class="bi bi-arrow-clockwise"></i> Recargar &uacute;ltimo dispositivo
+                <i class="bi bi-arrow-clockwise"></i> Recargar último dispositivo
             </button>
-            <button class="btn btn-success btn-sm" id="btnStartCalibration">
-                <i class="bi bi-cpu-fill"></i> Ejecutar Calibraci&oacute;n ML
+            <button class="btn btn-success btn-sm" id="btnStartCalibration" disabled>
+                <i class="bi bi-cpu-fill"></i> Ejecutar Calibración ML
+            </button>
+            <button class="btn btn-primary btn-lg" id="multipleCalibrationBtn">
+                <i class="bi bi-cpu-fill"></i> Calibrar Todos (PM2.5 y PM10)
             </button>
         </div>
     </div>
@@ -174,20 +177,20 @@
         <!-- Gráficos -->
         <div class="plot-container">
             <h5>Serie de Tiempo - PM2.5 y PM10</h5>
-            <div id="timeseriesPlot"></div>
+            <div id="timeSeriesPlot"></div>
         </div>
 
         <div class="row">
             <div class="col-md-6">
                 <div class="plot-container">
                     <h5>Distribución PM2.5</h5>
-                    <div id="boxplotPM25"></div>
+                    <div id="boxPlotPM25"></div>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="plot-container">
                     <h5>Distribución PM10</h5>
-                    <div id="boxplotPM10"></div>
+                    <div id="boxPlotPM10"></div>
                 </div>
             </div>
         </div>
@@ -200,9 +203,8 @@
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
             <h3 class="mb-0">
                 <i class="bi bi-bar-chart-line"></i>
-                Paso 3: Calibración frente a RMCAB
+                Resultados de Calibración
             </h3>
-            <div class="text-muted small" id="calibrationReferenceInfo"></div>
         </div>
 
         <div class="alert alert-info">
@@ -217,8 +219,15 @@
             </ul>
         </div>
 
-        <ul class="nav nav-pills mb-3" id="calibrationTabs" role="tablist"></ul>
-        <div class="tab-content" id="calibrationTabContent"></div>
+        <!-- Pestañas de dispositivos -->
+        <ul class="nav nav-tabs mb-4" id="calibrationDeviceTabs" role="tablist">
+            <!-- Las pestañas se generarán dinámicamente -->
+        </ul>
+
+        <!-- Contenido de las pestañas -->
+        <div class="tab-content" id="calibrationDeviceTabContent">
+            <!-- El contenido se generará dinámicamente -->
+        </div>
     </div>
 </section>
 {% endblock %}

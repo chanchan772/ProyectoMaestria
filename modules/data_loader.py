@@ -32,7 +32,13 @@ RMCAB_HEADERS = {
 RMCAB_STATION_INFO = {
     6: {
         'name': 'Las Ferias',
-        'short_name': 'Ferias'
+        'short_name': 'Ferias',
+        'channels': {'pm10': 1, 'pm25': 15}
+    },
+    17: {
+        'name': 'MinAmbiente',
+        'short_name': 'MinAmb',
+        'channels': {'pm10': 1, 'pm25': [15, 4, 8, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20]}  # Probar múltiples canales
     }
 }
 
@@ -82,7 +88,8 @@ def load_lowcost_data(start_date='2024-06-01', end_date='2024-07-31', devices=No
 
         # Procesar datos
         if not df.empty:
-            df['received_at'] = pd.to_datetime(df['received_at'])
+            # Convertir a datetime y eliminar timezone
+            df['received_at'] = pd.to_datetime(df['received_at']).dt.tz_localize(None)
             df = df.rename(columns={
                 'received_at': 'datetime',
                 'pm25_raw': 'pm25',
@@ -160,28 +167,34 @@ def _fetch_rmcab_pollutant_series(template, station_code, station_name, pollutan
     try:
         response = requests.post(RMCAB_ENDPOINT, data=body, headers=RMCAB_HEADERS, timeout=60)
     except requests.RequestException as exc:
-        print(f"Error de red solicitando RMCAB ({station_code}-{pollutant_channel}): {exc}")
+        print(f"      ❌ Error de red: {exc}")
         return pd.DataFrame()
 
     if response.status_code != 200:
-        print(f"Respuesta no exitosa de RMCAB ({station_code}-{pollutant_channel}): {response.status_code}")
+        print(f"      ❌ Status code: {response.status_code}")
         return pd.DataFrame()
 
     try:
         payload = response.json()
     except json.JSONDecodeError as exc:
-        print(f"Error interpretando respuesta de RMCAB ({station_code}-{pollutant_channel}): {exc}")
+        print(f"      ❌ Error JSON: {exc}")
         return pd.DataFrame()
 
     if 'ListDic' not in payload or not payload['ListDic']:
+        print(f"      ⚠️  ListDic vacío o inexistente")
         return pd.DataFrame()
 
     series_info = payload.get('series', [])
     pollutant_field = f"S_{station_code}_{pollutant_channel}"
+
+    # Buscar el nombre del contaminante en la respuesta
     pollutant_label = next((serie.get('name') for serie in series_info if serie.get('field') == pollutant_field), None)
 
     if not pollutant_label:
         pollutant_label = 'PM10' if pollutant_channel == 1 else 'PM2.5'
+        print(f"      ℹ️  Usando label por defecto: {pollutant_label}")
+    else:
+        print(f"      ℹ️  Label de API: '{pollutant_label}'")
 
     records = []
 
@@ -194,6 +207,7 @@ def _fetch_rmcab_pollutant_series(template, station_code, station_name, pollutan
 
         try:
             value = float(str(value_str).replace(',', '.'))
+            # Convertir a datetime sin timezone
             timestamp = datetime.strptime(datetime_str, '%d-%m-%Y %H:%M')
             records.append({
                 'datetime': timestamp,
@@ -204,6 +218,7 @@ def _fetch_rmcab_pollutant_series(template, station_code, station_name, pollutan
         except (ValueError, TypeError):
             continue
 
+    print(f"      ✅ Procesados {len(records)} registros válidos")
     return pd.DataFrame(records)
 
 def load_rmcab_data(station_code=6, start_date='2024-06-01', end_date='2024-07-31'):
@@ -225,6 +240,7 @@ def load_rmcab_data(station_code=6, start_date='2024-06-01', end_date='2024-07-3
 
         station_meta = RMCAB_STATION_INFO.get(station_code, {})
         station_name = station_meta.get('name', f'Estacion {station_code}')
+        channels = station_meta.get('channels', {'pm10': 1, 'pm25': 15})
 
         start = datetime.strptime(start_date, '%Y-%m-%d')
         end = datetime.strptime(end_date, '%Y-%m-%d')
@@ -235,24 +251,58 @@ def load_rmcab_data(station_code=6, start_date='2024-06-01', end_date='2024-07-3
         days = max((end - start).days, 1)
         user_date = end.strftime('%Y/%m/%d')
 
+        print(f"\n📡 Cargando datos RMCAB para {station_name} (código {station_code})")
+        print(f"   Periodo: {start_date} a {end_date} ({days} días)")
+        print(f"   Canales: PM10={channels['pm10']}, PM2.5={channels['pm25']}")
+
         datasets = []
-        for pollutant_channel in (1, 15):
-            df_pollutant = _fetch_rmcab_pollutant_series(
-                template,
-                station_code,
-                station_name,
-                pollutant_channel,
-                user_date,
-                days
-            )
-            if df_pollutant is not None and not df_pollutant.empty:
-                datasets.append(df_pollutant)
+        for pollutant_name, pollutant_channel_config in channels.items():
+            # Si el canal es una lista, probar cada uno hasta encontrar datos
+            if isinstance(pollutant_channel_config, list):
+                print(f"   Buscando {pollutant_name.upper()} en canales: {pollutant_channel_config}")
+                found = False
+                for pollutant_channel in pollutant_channel_config:
+                    print(f"      Probando canal {pollutant_channel}...")
+                    df_pollutant = _fetch_rmcab_pollutant_series(
+                        template,
+                        station_code,
+                        station_name,
+                        pollutant_channel,
+                        user_date,
+                        days
+                    )
+                    if df_pollutant is not None and not df_pollutant.empty and len(df_pollutant) > 0:
+                        print(f"   ✅ {pollutant_name.upper()} encontrado en canal {pollutant_channel}: {len(df_pollutant)} registros")
+                        datasets.append(df_pollutant)
+                        # Actualizar la configuración con el canal que funcionó
+                        RMCAB_STATION_INFO[station_code]['channels'][pollutant_name] = pollutant_channel
+                        found = True
+                        break
+                if not found:
+                    print(f"   ⚠️  {pollutant_name.upper()}: No se encontró en ningún canal")
+            else:
+                # Canal único
+                print(f"   Consultando {pollutant_name.upper()} (canal {pollutant_channel_config})...")
+                df_pollutant = _fetch_rmcab_pollutant_series(
+                    template,
+                    station_code,
+                    station_name,
+                    pollutant_channel_config,
+                    user_date,
+                    days
+                )
+                if df_pollutant is not None and not df_pollutant.empty:
+                    print(f"   ✅ {pollutant_name.upper()}: {len(df_pollutant)} registros")
+                    datasets.append(df_pollutant)
+                else:
+                    print(f"   ⚠️  {pollutant_name.upper()}: Sin datos")
 
         if not datasets:
-            print('No se pudieron obtener datos de RMCAB')
+            print('❌ No se pudieron obtener datos de RMCAB')
             return pd.DataFrame()
 
         combined = pd.concat(datasets, ignore_index=True)
+        print(f"   Total combinado: {len(combined)} registros")
 
         pivot = combined.pivot_table(
             index='datetime',
@@ -261,28 +311,39 @@ def load_rmcab_data(station_code=6, start_date='2024-06-01', end_date='2024-07-3
             aggfunc='first'
         ).reset_index()
 
+        print(f"   Columnas después del pivot: {list(pivot.columns)}")
+
         column_mapping = {}
         for col in pivot.columns:
             if isinstance(col, str):
-                normalized = col.lower().replace(' ', '').replace('.', '')
-                if normalized == 'pm25':
+                normalized = col.lower().replace(' ', '').replace('.', '').replace('μ', '')
+                if 'pm25' in normalized or 'pm2' in normalized:
                     column_mapping[col] = 'pm25'
-                elif normalized == 'pm10':
+                elif 'pm10' in normalized:
                     column_mapping[col] = 'pm10'
 
         if column_mapping:
+            print(f"   Renombrando columnas: {column_mapping}")
             pivot = pivot.rename(columns=column_mapping)
 
         if 'pm25' not in pivot.columns:
+            print(f"   ⚠️  Agregando columna pm25 vacía")
             pivot['pm25'] = None
         if 'pm10' not in pivot.columns:
+            print(f"   ⚠️  Agregando columna pm10 vacía")
             pivot['pm10'] = None
 
         pivot['station'] = f'RMCAB_{station_code}'
 
+        print(f"   ✅ Datos finales: {len(pivot)} registros")
+        print(f"   PM2.5 no nulos: {pivot['pm25'].notna().sum()}")
+        print(f"   PM10 no nulos: {pivot['pm10'].notna().sum()}")
+
         return pivot.sort_values('datetime')
     except Exception as exc:
-        print(f"Error cargando datos de RMCAB: {exc}")
+        print(f"❌ Error cargando datos de RMCAB: {exc}")
+        import traceback
+        traceback.print_exc()
         return None
 
 

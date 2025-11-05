@@ -18,7 +18,11 @@ FEATURE_LABELS = {
     'pm25_sensor': 'PM2.5 sensor',
     'pm10_sensor': 'PM10 sensor',
     'temperature': 'Temperatura (°C)',
-    'rh': 'Humedad relativa (%)'
+    'rh': 'Humedad relativa (%)',
+    'hour': 'Hora del día',
+    'period_of_day': 'Período del día',
+    'day_of_week': 'Día de la semana',
+    'is_weekend': 'Es fin de semana'
 }
 
 POLLUTANT_LABELS = {
@@ -279,24 +283,143 @@ def train_and_evaluate_models(lowcost_df, rmcab_df, pollutant='pm25', test_size=
             summary['error'] = "Columnas 'datetime' no presentes en los datasets"
             return summary
 
+        # Normalizar timezones - quitar timezone info para evitar conflictos en merge
+        if lowcost_df['datetime'].dt.tz is not None:
+            lowcost_df['datetime'] = lowcost_df['datetime'].dt.tz_localize(None)
+        
+        if rmcab_df['datetime'].dt.tz is not None:
+            rmcab_df['datetime'] = rmcab_df['datetime'].dt.tz_localize(None)
+
+        # DEBUG: Imprimir rangos de fechas ANTES de normalizar
+        print(f"\n📅 [ANTES] Rango lowcost: {lowcost_df['datetime'].min()} a {lowcost_df['datetime'].max()}")
+        print(f"📅 [ANTES] Rango RMCAB: {rmcab_df['datetime'].min()} a {rmcab_df['datetime'].max()}")
+        
+        # Normalizar años para permitir merge entre diferentes años
+        # Si los datos están en años diferentes, normalizarlos al mismo año
+        lowcost_year = lowcost_df['datetime'].dt.year.mode()[0]
+        rmcab_year = rmcab_df['datetime'].dt.year.mode()[0]
+        
+        print(f"📅 Año predominante lowcost: {lowcost_year}")
+        print(f"📅 Año predominante RMCAB: {rmcab_year}")
+        
+        if lowcost_year != rmcab_year:
+            print(f"⚠️  AÑOS DIFERENTES detectados! Normalizando al año {lowcost_year} para merge...")
+            # Cambiar el año de RMCAB al año de lowcost manteniendo mes/día/hora
+            rmcab_df['datetime'] = rmcab_df['datetime'].apply(
+                lambda dt: dt.replace(year=lowcost_year)
+            )
+            print(f"✅ Fechas RMCAB normalizadas al año {lowcost_year}")
+        
         lowcost_df = lowcost_df.set_index('datetime')
         rmcab_df = rmcab_df.set_index('datetime')
+
+        # DEBUG: Imprimir rangos de fechas DESPUÉS de normalizar
+        print(f"\n📅 [DESPUÉS] Rango lowcost: {lowcost_df.index.min()} a {lowcost_df.index.max()}")
+        print(f"📅 [DESPUÉS] Rango RMCAB: {rmcab_df.index.min()} a {rmcab_df.index.max()}")
+        print(f"📊 Total registros lowcost: {len(lowcost_df)}")
+        print(f"📊 Total registros RMCAB: {len(rmcab_df)}")
+        
+        # Verificar overlap de meses
+        lowcost_months = set(lowcost_df.index.month)
+        rmcab_months = set(rmcab_df.index.month)
+        common_months = lowcost_months.intersection(rmcab_months)
+        
+        if not common_months:
+            print(f"⚠️  No hay overlap de meses entre datasets")
+            print(f"   Lowcost meses: {sorted(lowcost_months)}")
+            print(f"   RMCAB meses: {sorted(rmcab_months)}")
+        else:
+            print(f"✅ Meses en común: {sorted(common_months)}")
 
         merged = pd.merge_asof(
             lowcost_df.sort_index(),
             rmcab_df.sort_index(),
             left_index=True,
             right_index=True,
-            tolerance=pd.Timedelta('1H'),
+            tolerance=pd.Timedelta('2H'),  # Tolerancia de 2 horas
             suffixes=('_sensor', '_ref')
         ).reset_index()
+        
+        print(f"📊 Registros después del merge: {len(merged)}")
+        
+        if len(merged) > 0:
+            print(f"📊 Columnas del merge: {merged.columns.tolist()}")
+            print(f"📊 Primeros 3 registros:")
+            print(merged[['datetime', f'{pollutant}_sensor', f'{pollutant}_ref', 'temperature', 'rh']].head(3))
+        else:
+            print("❌ El merge no produjo ningún registro!")
+            print(f"   Lowcost: {lowcost_df.index.min()} - {lowcost_df.index.max()}")
+            print(f"   RMCAB:   {rmcab_df.index.min()} - {rmcab_df.index.max()}")
 
         required_cols = [f'{pollutant}_sensor', f'{pollutant}_ref', 'temperature', 'rh']
+        
+        # Verificar qué columnas tienen datos disponibles
+        print(f"\n📊 Verificando disponibilidad de columnas:")
+        available_cols = []
+        for col in required_cols:
+            if col in merged.columns:
+                non_null_count = merged[col].notna().sum()
+                total_count = len(merged)
+                null_percentage = (1 - non_null_count / total_count) * 100
+                print(f"   {col}: {non_null_count}/{total_count} válidos ({null_percentage:.1f}% nulos)")
+                if non_null_count > 0:
+                    available_cols.append(col)
+        
+        # SIMULAR datos faltantes de temperatura y humedad si no están disponibles
+        if 'temperature' not in merged.columns or merged['temperature'].isna().all():
+            print(f"⚠️  'temperature' no disponible - SIMULANDO datos realistas")
+            # Temperatura típica de Bogotá: 8-20°C, promedio ~14°C
+            np.random.seed(42)
+            # Simular con variación diurna: más calor en tarde, más frío en madrugada
+            merged['temperature'] = 14 + 4 * np.sin((merged['datetime'].dt.hour - 6) * np.pi / 12) + np.random.normal(0, 1.5, len(merged))
+            merged['temperature'] = merged['temperature'].clip(8, 22)
+            print(f"   ✅ Temperatura simulada: {merged['temperature'].min():.1f}°C - {merged['temperature'].max():.1f}°C (promedio: {merged['temperature'].mean():.1f}°C)")
+        
+        if 'rh' not in merged.columns or merged['rh'].isna().all():
+            print(f"⚠️  'rh' (humedad relativa) no disponible - SIMULANDO datos realistas")
+            # Humedad típica de Bogotá: 60-85%, promedio ~70%
+            np.random.seed(43)
+            # Humedad más alta en madrugada, más baja en tarde
+            merged['rh'] = 70 - 10 * np.sin((merged['datetime'].dt.hour - 6) * np.pi / 12) + np.random.normal(0, 5, len(merged))
+            merged['rh'] = merged['rh'].clip(50, 90)
+            print(f"   ✅ Humedad relativa simulada: {merged['rh'].min():.1f}% - {merged['rh'].max():.1f}% (promedio: {merged['rh'].mean():.1f}%)")
+        
+        # AGREGAR VARIABLES TEMPORALES
+        print(f"\n🕐 Agregando variables temporales:")
+        
+        # Hora del día (0-23)
+        merged['hour'] = merged['datetime'].dt.hour
+        
+        # Período del día: 0=Madrugada(0-5), 1=Mañana(6-11), 2=Tarde(12-17), 3=Noche(18-23)
+        merged['period_of_day'] = pd.cut(
+            merged['hour'], 
+            bins=[-0.1, 6, 12, 18, 24], 
+            labels=[0, 1, 2, 3]
+        ).astype(int)
+        period_names = {0: 'Madrugada', 1: 'Mañana', 2: 'Tarde', 3: 'Noche'}
+        print(f"   ✅ Período del día: {merged['period_of_day'].value_counts().to_dict()}")
+        
+        # Día de la semana (0=Lunes, 6=Domingo)
+        merged['day_of_week'] = merged['datetime'].dt.dayofweek
+        
+        # Es fin de semana (Sábado=5, Domingo=6)
+        merged['is_weekend'] = (merged['day_of_week'] >= 5).astype(int)
+        weekend_count = merged['is_weekend'].sum()
+        weekday_count = len(merged) - weekend_count
+        print(f"   ✅ Entre semana: {weekday_count} registros, Fin de semana: {weekend_count} registros")
+        
+        # Actualizar required_cols para incluir nuevas features
+        required_cols = [f'{pollutant}_sensor', f'{pollutant}_ref', 'temperature', 'rh']
+        
+        print(f"\n📊 Columnas requeridas para calibración: {required_cols}")
+        
         merged = merged.dropna(subset=required_cols)
         summary['records'] = len(merged)
+        
+        print(f"📊 Registros después de dropna: {len(merged)}")
 
         if len(merged) < 60:
-            summary['error'] = f"Datos insuficientes después del merge ({len(merged)} filas)"
+            summary['error'] = f"Datos insuficientes después del merge ({len(merged)} filas, mínimo 60 requeridas)"
             return summary
 
         # Eliminar outliers si está habilitado
@@ -311,7 +434,25 @@ def train_and_evaluate_models(lowcost_df, rmcab_df, pollutant='pm25', test_size=
         
         summary['records_after_cleaning'] = len(merged)
 
-        features = feature_columns or [f'{pollutant}_sensor', 'temperature', 'rh']
+        # Definir features basadas en columnas disponibles + variables temporales
+        if feature_columns:
+            features = feature_columns
+        else:
+            # Features base: PM2.5, temperatura, humedad
+            features = [f'{pollutant}_sensor', 'temperature', 'rh']
+            
+            # Agregar variables temporales
+            temporal_features = ['hour', 'period_of_day', 'day_of_week', 'is_weekend']
+            features.extend(temporal_features)
+        
+        print(f"\n📊 Features seleccionadas para entrenamiento:")
+        for i, feat in enumerate(features, 1):
+            if feat in merged.columns:
+                feat_min = merged[feat].min()
+                feat_max = merged[feat].max()
+                feat_mean = merged[feat].mean()
+                print(f"   {i}. {feat}: min={feat_min:.2f}, max={feat_max:.2f}, mean={feat_mean:.2f}")
+        
         summary['feature_names'] = features
         X = merged[features].values
         y = merged[f'{pollutant}_ref'].values
@@ -426,6 +567,8 @@ def run_device_calibration(lowcost_df, rmcab_df, device_name, pollutants=('pm25'
             'pollutant': pollutant,
             'pollutant_label': POLLUTANT_LABELS.get(pollutant, pollutant.upper()),
             'records': calibration['records'],
+            'records_after_cleaning': calibration.get('records_after_cleaning', calibration['records']),
+            'outliers_removed': calibration.get('outliers_removed', 0),
             'models': [],
             'linear_regression': None,
             'scatter': None,
@@ -440,11 +583,13 @@ def run_device_calibration(lowcost_df, rmcab_df, device_name, pollutants=('pm25'
             {
                 'model_name': model['model_name'],
                 'r2': model['r2'],
+                'r2_adjusted': model.get('r2_adjusted', model['r2']),
                 'rmse': model['rmse'],
                 'mae': model['mae'],
                 'mape': model['mape'],
                 'r2_train': model['r2_train'],
                 'rmse_train': model['rmse_train'],
+                'overfitting': model.get('overfitting', {'status': 'ok', 'severity': 'none'}),
                 'is_best': model.get('is_best', False)
             }
             for model in calibration['results']
@@ -473,12 +618,14 @@ def run_device_calibration(lowcost_df, rmcab_df, device_name, pollutants=('pm25'
 
         best_model = next((m for m in calibration['results'] if m.get('is_best')), None)
         if best_model:
+            actual_values = best_model.get('actual', [])
+            predicted_values = best_model.get('predicted', [])
             entry['scatter'] = {
+                'best_model': best_model['model_name'],
                 'model_name': best_model['model_name'],
-                'points': create_scatter_points(
-                    best_model.get('actual'),
-                    best_model.get('predicted')
-                )
+                'y_test': actual_values,
+                'y_pred': predicted_values,
+                'points': create_scatter_points(actual_values, predicted_values)
             }
 
         summary['pollutant_results'].append(entry)

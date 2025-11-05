@@ -314,6 +314,118 @@ def api_calibrate_device():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/calibrate-multiple-devices', methods=['POST'])
+def api_calibrate_multiple_devices():
+    """Ejecuta calibración para múltiples dispositivos con múltiples contaminantes"""
+    try:
+        devices = request.json.get('devices', ['Aire2', 'Aire4', 'Aire5'])
+        start_date = request.json.get('start_date', '2024-06-01')
+        end_date = request.json.get('end_date', '2024-07-31')
+        pollutants = request.json.get('pollutants', ['pm25'])  # Soportar múltiples contaminantes
+
+        print(f"\n{'='*60}")
+        print(f"CALIBRACIÓN MÚLTIPLE INICIADA")
+        print(f"{'='*60}")
+        print(f"Dispositivos: {devices}")
+        print(f"Periodo: {start_date} a {end_date}")
+        print(f"Contaminantes: {pollutants}")
+
+        # Cargar datos de todos los sensores
+        print(f"\n📊 Cargando datos de sensores...")
+        lowcost_data = load_lowcost_data(start_date, end_date, devices)
+        print(f"✅ Datos lowcost cargados: {len(lowcost_data) if lowcost_data is not None and not lowcost_data.empty else 0} registros")
+        
+        print(f"\n📊 Cargando datos de RMCAB...")
+        rmcab_data = load_rmcab_data(6, start_date, end_date)  # Las Ferias
+        print(f"✅ Datos RMCAB cargados: {len(rmcab_data) if rmcab_data is not None and not rmcab_data.empty else 0} registros")
+
+        if (
+            lowcost_data is None or rmcab_data is None or
+            lowcost_data.empty or rmcab_data.empty
+        ):
+            error_msg = 'No se pudieron cargar los datos'
+            print(f"❌ ERROR: {error_msg}")
+            return jsonify({'error': error_msg}), 404
+
+        # Calibrar cada dispositivo
+        results_by_device = {}
+        
+        for device_name in devices:
+            print(f"\n{'='*60}")
+            print(f"📡 Calibrando {device_name}...")
+            print(f"{'='*60}")
+            
+            device_data = lowcost_data[lowcost_data['device_name'] == device_name].copy()
+            
+            if device_data.empty:
+                error_msg = f'No hay datos para {device_name} en el periodo indicado'
+                print(f"⚠️  {error_msg}")
+                results_by_device[device_name] = {
+                    'success': False,
+                    'error': error_msg
+                }
+                continue
+
+            print(f"📊 Registros de {device_name}: {len(device_data)}")
+
+            try:
+                calibration = run_device_calibration(device_data, rmcab_data, device_name, tuple(pollutants))
+                pollutant_results = calibration.get('pollutant_results', [])
+
+                if not pollutant_results or any(pr.get('error') for pr in pollutant_results):
+                    errors = [pr.get('error') for pr in pollutant_results if pr.get('error')]
+                    message = '; '.join(errors) if errors else 'No se obtuvieron resultados'
+                    print(f"❌ Error en calibración de {device_name}: {message}")
+                    results_by_device[device_name] = {
+                        'success': False,
+                        'error': message
+                    }
+                else:
+                    print(f"✅ {device_name} calibrado exitosamente")
+                    print(f"   - Contaminantes: {len(pollutant_results)}")
+                    for pr in pollutant_results:
+                        print(f"   - {pr.get('pollutant_label')}: {pr.get('records', 0)} registros, {len(pr.get('models', []))} modelos")
+                    
+                    results_by_device[device_name] = {
+                        'success': True,
+                        'device': device_name,
+                        'pollutant_results': pollutant_results
+                    }
+            except Exception as device_error:
+                error_msg = str(device_error)
+                print(f"❌ Excepción en {device_name}: {error_msg}")
+                import traceback
+                traceback.print_exc()
+                results_by_device[device_name] = {
+                    'success': False,
+                    'error': error_msg
+                }
+
+        # Verificar si al menos uno tuvo éxito
+        success_count = sum(1 for r in results_by_device.values() if r.get('success'))
+        
+        print(f"\n{'='*60}")
+        print(f"RESUMEN DE CALIBRACIÓN")
+        print(f"{'='*60}")
+        print(f"Exitosos: {success_count}/{len(devices)}")
+        for device, result in results_by_device.items():
+            status = "✅" if result.get('success') else "❌"
+            print(f"{status} {device}: {result.get('error', 'OK')}")
+        print(f"{'='*60}\n")
+        
+        return jsonify({
+            'success': success_count > 0,
+            'devices_calibrated': success_count,
+            'total_devices': len(devices),
+            'results_by_device': results_by_device
+        })
+    except Exception as e:
+        error_msg = str(e)
+        print(f"\n❌ ERROR GENERAL: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': error_msg}), 500
+
 # =======================
 # MANEJO DE ERRORES
 # =======================
@@ -333,4 +445,5 @@ def internal_error(error):
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_ENV', 'development') == 'development'
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    # Desactivar reloader para evitar interrupciones durante calibración
+    app.run(host='0.0.0.0', port=port, debug=debug, use_reloader=False)

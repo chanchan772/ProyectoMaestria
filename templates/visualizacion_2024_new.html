@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Visualización 2024{% endblock %}
+{% block title %}Visualización Año Completo 2024 (PM2.5 y PM10){% endblock %}
 
 {% block extra_css %}
 <style>
@@ -54,6 +54,19 @@
     .comparison-plot {
         min-height: 320px;
     }
+    .device-card {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    .device-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .device-card.selected {
+        border-color: var(--primary-green);
+        background-color: #f0fdf4;
+    }
 </style>
 {% endblock %}
 
@@ -71,7 +84,7 @@
     <div class="container">
         <h1>
             <i class="bi bi-calendar-range"></i>
-            Visualización 2024
+            Visualización Año Completo 2024
         </h1>
         <p class="lead">
             Análisis individual de sensores y calibración - Periodo: 1 enero - 31 diciembre 2024
@@ -98,15 +111,15 @@
                 <button type="button" class="btn btn-outline-success quick-view-btn" data-device="Aire5" data-type="sensor">
                     <i class="bi bi-cpu"></i> Aire5
                 </button>
-                <button type="button" class="btn btn-outline-warning quick-view-btn" data-device="RMCAB_MinAmb" data-type="rmcab">
-                    <i class="bi bi-building"></i> RMCAB MinAmbiente
+                <button type="button" class="btn btn-outline-warning quick-view-btn" data-device="RMCAB_MinAmb" data-type="rmcab" data-station="9">
+                    <i class="bi bi-building"></i> RMCAB Min Ambiente
                 </button>
                 <button type="button" class="btn btn-outline-secondary quick-view-btn" data-view="comparison">
                     <i class="bi bi-grid-3x3-gap-fill"></i> Comparar 4 Sensores
                 </button>
             </div>
             <small class="text-muted mt-2 text-center">
-                Usa los botones para cargar r&aacute;pidamente cada sensor o visualizar los cuatro al tiempo.
+                Usa los botones para cargar rápidamente cada sensor o visualizar los cuatro al tiempo.
             </small>
         </div>
         <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
@@ -128,10 +141,10 @@
     <div class="container">
         <h3 class="mb-4">
             <i class="bi bi-grid-1x2-fill"></i>
-            Paso 2: Comparativa de Sensores (2024)
+            Paso 2: Comparativa de Sensores (Año 2024)
         </h3>
         <p class="text-muted">
-            Observa simult&aacute;neamente los cuatro sensores para identificar patrones, brechas y coherencia frente a la estaci&oacute;n de referencia RMCAB.
+            Observa simultáneamente los cuatro sensores para identificar patrones, brechas y coherencia frente a la estación de referencia RMCAB.
         </p>
 
         <div class="row g-4">
@@ -155,7 +168,7 @@
             </div>
             <div class="col-md-6">
                 <div class="plot-container small">
-                    <h5>RMCAB MinAmbiente</h5>
+                    <h5>RMCAB Min Ambiente</h5>
                     <div class="comparison-plot" id="comparisonPlotRMCAB_MinAmb"></div>
                 </div>
             </div>
@@ -213,7 +226,7 @@
                 Referencia
             </h5>
             <ul class="mb-0">
-                <li>El referente es la estación oficial RMCAB (MinAmbiente).</li>
+                <li>El referente es la estación oficial RMCAB (Min Ambiente - Código 9).</li>
                 <li><strong>R²</strong> cercano a 1 indica mejor ajuste; <strong>RMSE</strong> y <strong>MAE</strong> bajos implican menor error.</li>
                 <li>Se muestra la fórmula de la Regresión Lineal y la dispersión real vs. calibrado.</li>
             </ul>
