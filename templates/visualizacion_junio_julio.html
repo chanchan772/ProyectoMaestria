@@ -104,6 +104,9 @@
                 <button type="button" class="btn btn-outline-secondary quick-view-btn" data-view="comparison">
                     <i class="bi bi-grid-3x3-gap-fill"></i> Comparar 4 Sensores
                 </button>
+                <button type="button" class="btn btn-outline-primary quick-view-btn" data-view="stage2">
+                    <i class="bi bi-calendar-week"></i> Visualización etapa 2
+                </button>
             </div>
             <small class="text-muted mt-2 text-center">
                 Usa los botones para cargar r&aacute;pidamente cada sensor o visualizar los cuatro al tiempo.
@@ -230,6 +233,95 @@
         <!-- Contenido de las pestañas -->
         <div class="tab-content" id="calibrationDeviceTabContent">
             <!-- El contenido se generará dinámicamente -->
+        </div>
+    </div>
+</section>
+
+<!-- Visualización etapa 2 -->
+<section class="section bg-white" id="stage2Section" style="display: none;">
+    <div class="container">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+            <h3 class="mb-0">
+                <i class="bi bi-calendar-check"></i>
+                Visualización etapa 2 - Ventana óptima de 5 días
+            </h3>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" id="stage2ReloadBtn">
+                    <i class="bi bi-arrow-repeat"></i> Recalcular ventana
+                </button>
+            </div>
+        </div>
+
+        <div id="stage2AlertContainer"></div>
+
+        <div class="row g-3 mb-4" id="stage2SummaryRow">
+            <!-- Métricas de la ventana óptima -->
+        </div>
+
+        <div class="plot-container small mb-4">
+            <h5>Consulta SQL ejecutada</h5>
+            <div id="stage2QueryBox" class="small text-break"></div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4 bg-light">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="stage2StartDate">Inicio manual</label>
+                        <input type="date" class="form-control" id="stage2StartDate" value="2023-06-22">
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <label class="form-label" for="stage2EndDate">Fin manual</label>
+                        <input type="date" class="form-control" id="stage2EndDate" value="2023-06-25">
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label class="form-label d-none d-md-block">&nbsp;</label>
+                        <button class="btn btn-outline-primary w-100" id="stage2ApplyManualBtn">
+                            <i class="bi bi-calendar-range"></i> Aplicar ventana manual
+                        </button>
+                    </div>
+                </div>
+                <small class="text-muted d-block mt-3">
+                    Ajusta las fechas para analizar un intervalo específico (por ejemplo, del 21 al 25 de junio) y luego ejecuta la calibración.
+                </small>
+            </div>
+        </div>
+
+        <div class="plot-container mb-4">
+            <h5>Densidad de registros por dispositivo</h5>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Dispositivo</th>
+                            <th>Registros totales</th>
+                            <th>PM2.5 válidos</th>
+                            <th>PM10 válidos</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stage2DeviceTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="row g-4" id="stage2ChartsRow"></div>
+
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mt-4 mb-3">
+            <p class="mb-0 text-muted flex-grow-1">
+                Ejecuta la calibración avanzada para comparar los algoritmos y descarga la ventana actual en Excel.
+            </p>
+            <div class="d-flex flex-column flex-sm-row gap-2">
+                <button class="btn btn-outline-secondary" id="stage2DownloadBtn">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Descargar datos (Excel)
+                </button>
+                <button class="btn btn-success" id="stage2CalibrateBtn">
+                    <i class="bi bi-cpu"></i> Ejecutar calibración etapa 2
+                </button>
+            </div>
+        </div>
+
+        <div id="stage2CalibrationResults" class="mt-4">
+            <!-- Resultados de calibración etapa 2 -->
         </div>
     </div>
 </section>

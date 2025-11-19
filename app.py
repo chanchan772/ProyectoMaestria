@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 import json
 import pandas as pd
 import numpy as np
+from datetime import datetime, date
+from io import BytesIO
 
 # Cargar variables de entorno
 load_dotenv()
@@ -18,9 +20,22 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Importar módulos personalizados
-from modules.data_loader import load_lowcost_data, load_rmcab_data, RMCAB_STATION_INFO
-from modules.calibration import (get_calibration_models, train_and_evaluate_models, run_device_calibration,
-                                  load_calibration_model, predict_with_saved_model)
+from modules.data_loader import (
+    load_lowcost_data,
+    load_rmcab_data,
+    RMCAB_STATION_INFO,
+    find_dense_window,
+    align_lowcost_with_reference,
+    get_last_lowcost_query
+)
+from modules.calibration import (
+    get_calibration_models,
+    train_and_evaluate_models,
+    run_device_calibration,
+    load_calibration_model,
+    predict_with_saved_model,
+    run_stage2_calibration
+)
 from modules.visualization import create_timeseries_plot, create_boxplot, create_heatmap
 from modules.metrics import calculate_statistics
 
@@ -45,6 +60,111 @@ def safe_number(value, decimals=4):
         return round(float(value), decimals)
     except Exception:
         return None
+
+
+def ensure_serializable(value):
+    """
+    Convierte estructuras con tipos de NumPy/Pandas a tipos compatibles con JSON.
+    """
+    if value is None or isinstance(value, (int, float, str, bool)):
+        return value
+
+    if value is pd.NA:
+        return None
+
+    if isinstance(value, np.generic):
+        return value.item()
+
+    if isinstance(value, np.ndarray):
+        return ensure_serializable(value.tolist())
+
+    if isinstance(value, (pd.Series, pd.Index)):
+        return ensure_serializable(value.tolist())
+
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+
+    if isinstance(value, pd.Timestamp):
+        return value.to_pydatetime().isoformat()
+
+    if isinstance(value, dict):
+        return {str(key): ensure_serializable(val) for key, val in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [ensure_serializable(item) for item in value]
+
+    if isinstance(value, bytes):
+        return value.decode('utf-8', errors='ignore')
+
+    return value
+
+
+def normalize_device_list(devices):
+    if devices is None:
+        return None
+    if isinstance(devices, str):
+        devices = [devices]
+    elif isinstance(devices, set):
+        devices = list(devices)
+    elif not isinstance(devices, list):
+        return None
+    normalized = [str(device).strip() for device in devices if device]
+    return normalized or None
+
+
+def prepare_stage2_datasets(devices, station_code, start_date, end_date, window_start_ts, window_end_ts):
+    """
+    Carga y filtra los datos de sensores y RMCAB para la ventana solicitada.
+
+    Args:
+        devices (list[str]): Sensores a incluir.
+        station_code (int): Código de estación RMCAB.
+        start_date (str): Fecha inicial del rango solicitado.
+        end_date (str): Fecha final del rango solicitado.
+        window_start_ts (pd.Timestamp): Inicio de la ventana optimizada.
+        window_end_ts (pd.Timestamp): Fin de la ventana optimizada.
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame]: Datos de sensores y RMCAB alineados.
+    """
+    lowcost_data = load_lowcost_data(start_date, end_date, devices, aggregate=False, filter_by_keys=False)
+    if lowcost_data is None or lowcost_data.empty:
+        raise ValueError('No se encontraron datos de sensores para calibrar.')
+
+    lowcost_data = lowcost_data.copy()
+    lowcost_data['datetime'] = pd.to_datetime(lowcost_data['datetime']).dt.tz_localize(None)
+    lowcost_window = lowcost_data[
+        (lowcost_data['datetime'] >= window_start_ts) &
+        (lowcost_data['datetime'] <= window_end_ts)
+    ].copy()
+    if lowcost_window.empty:
+        raise ValueError('Los sensores no tienen datos dentro de la ventana indicada.')
+
+    rmcab_data = load_rmcab_data(station_code, start_date, end_date)
+    if rmcab_data is None or rmcab_data.empty:
+        raise ValueError('No fue posible cargar datos de la RMCAB para calibrar.')
+
+    rmcab_window = rmcab_data.copy()
+    rmcab_window['datetime'] = pd.to_datetime(rmcab_window['datetime']).dt.tz_localize(None)
+    rmcab_window = rmcab_window[
+        (rmcab_window['datetime'] >= window_start_ts) &
+        (rmcab_window['datetime'] <= window_end_ts)
+    ].copy()
+    if rmcab_window.empty:
+        raise ValueError('La RMCAB no contiene datos en la ventana seleccionada.')
+
+    reference_hours = set(rmcab_window['datetime'].dt.floor('H'))
+    if reference_hours:
+        lowcost_window['hour_key'] = lowcost_window['datetime'].dt.floor('H')
+        lowcost_window = lowcost_window[lowcost_window['hour_key'].isin(reference_hours)]
+        lowcost_window = lowcost_window.sort_values('datetime').drop_duplicates(subset=['device_name', 'hour_key'])
+        lowcost_window['datetime'] = lowcost_window['hour_key']
+        lowcost_window = lowcost_window.drop(columns=['hour_key'])
+
+    if lowcost_window.empty:
+        raise ValueError('No hay lecturas de sensores que coincidan con las horas de la RMCAB en la ventana seleccionada.')
+
+    return lowcost_window.sort_values('datetime'), rmcab_window.sort_values('datetime')
 
 # =======================
 # RUTAS PRINCIPALES
@@ -90,7 +210,11 @@ def api_load_lowcost():
     try:
         data = load_lowcost_data()
         if data is None or data.empty:
-            return jsonify({'error': 'No se encontraron datos'}), 404
+            return jsonify({
+                'success': False,
+                'error': 'No se encontraron datos',
+                'query': get_last_lowcost_query()
+            }), 404
 
         # Convertir a formato JSON
         data_json = data.to_json(orient='records', date_format='iso')
@@ -102,14 +226,277 @@ def api_load_lowcost():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/stage2/load', methods=['POST'])
+def api_stage2_load():
+    """Identifica la ventana de mayor densidad y entrega datos completos/filtrados."""
+    try:
+        payload = request.json or {}
+        start_date = payload.get('start_date', '2023-01-01')
+        end_date = payload.get('end_date', '2023-12-31')
+        devices = normalize_device_list(payload.get('devices'))
+        station_code = payload.get('station_code', 6)
+        window_days = payload.get('window_days', 5)
+
+        lowcost_data = load_lowcost_data(start_date, end_date, devices, aggregate=False, filter_by_keys=False)
+        if lowcost_data is None or lowcost_data.empty:
+            return jsonify({
+                'success': False,
+                'error': 'No se encontraron datos de sensores en el periodo indicado.',
+                'query': get_last_lowcost_query()
+            }), 404
+
+        window_info = find_dense_window(lowcost_data, window_days=window_days, devices=devices)
+        if not window_info:
+            return jsonify({'success': False, 'error': 'No fue posible identificar una ventana óptima de datos.'}), 400
+
+        window_df = window_info['subset'].copy().sort_values('datetime')
+        window_df['datetime'] = window_df['datetime'].dt.tz_localize(None)
+
+        full_lowcost_records = json.loads(
+            lowcost_data.sort_values('datetime').to_json(orient='records', date_format='iso')
+        )
+
+        rmcab_full = load_rmcab_data(station_code, start_date, end_date)
+
+        def prepare_rmcab(df):
+            if df is None or df.empty:
+                return pd.DataFrame()
+            prepared = df.copy()
+            prepared['datetime'] = pd.to_datetime(prepared['datetime']).dt.tz_localize(None)
+            if 'pm25_ref' in prepared.columns and 'pm25' not in prepared.columns:
+                prepared['pm25'] = prepared['pm25_ref']
+            if 'pm10_ref' in prepared.columns and 'pm10' not in prepared.columns:
+                prepared['pm10'] = prepared['pm10_ref']
+            return prepared.sort_values('datetime')
+
+        rmcab_prepared = prepare_rmcab(rmcab_full)
+        full_rmcab_records = json.loads(rmcab_prepared.to_json(orient='records', date_format='iso')) if not rmcab_prepared.empty else []
+
+        reference_hours = set()
+        rmcab_window_records = []
+        if not rmcab_prepared.empty:
+            mask = (
+                (rmcab_prepared['datetime'] >= window_info['start']) &
+                (rmcab_prepared['datetime'] <= window_info['end'])
+            )
+            rmcab_window = rmcab_prepared.loc[mask].copy()
+            reference_hours = set(rmcab_window['datetime'].dt.floor('H'))
+            rmcab_window_records = json.loads(rmcab_window.to_json(orient='records', date_format='iso'))
+
+        if reference_hours:
+            window_df['hour_key'] = window_df['datetime'].dt.floor('H')
+            window_df = window_df[window_df['hour_key'].isin(reference_hours)]
+            window_df = window_df.sort_values('datetime').drop_duplicates(subset=['device_name', 'hour_key'])
+            window_df['datetime'] = window_df['hour_key']
+            window_df = window_df.drop(columns=['hour_key'])
+
+        window_records = json.loads(window_df.to_json(orient='records', date_format='iso'))
+
+        per_device_summary = []
+        per_device_counts = window_info.get('per_device_counts', {}) or {}
+        pollutant_counts_info = window_info.get('pollutant_counts', {}) or {}
+
+        if per_device_counts:
+            for device, count in sorted(per_device_counts.items(), key=lambda item: (-item[1], item[0])):
+                pollutant_counts = pollutant_counts_info.get(device, {'pm25': 0, 'pm10': 0})
+                per_device_summary.append({
+                    'device': device,
+                    'label': DEVICE_LABELS.get(device, device),
+                    'records': int(count),
+                    'pm25': int(pollutant_counts.get('pm25', 0)),
+                    'pm10': int(pollutant_counts.get('pm10', 0))
+                })
+        elif devices:
+            for device in devices:
+                per_device_summary.append({
+                    'device': device,
+                    'label': DEVICE_LABELS.get(device, device),
+                    'records': 0,
+                    'pm25': 0,
+                    'pm10': 0
+                })
+
+        reference_info = RMCAB_STATION_INFO.get(station_code, {})
+
+        return jsonify({
+            'success': True,
+            'window': {
+                'start': window_info['start'].isoformat(),
+                'end': window_info['end'].isoformat(),
+                'start_date': window_info['start'].date().isoformat(),
+                'end_date': window_info['end'].date().isoformat(),
+                'total_records': window_info['total_records'],
+                'hours_covered': window_info.get('hours_covered'),
+                'per_device': per_device_summary,
+                'station': {
+                    'code': station_code,
+                    'name': reference_info.get('name', f'RMCAB {station_code}')
+                }
+            },
+            'lowcost': window_records,
+            'rmcab': rmcab_window_records,
+            'full_lowcost': full_lowcost_records,
+            'full_rmcab': full_rmcab_records,
+            'query': get_last_lowcost_query()
+        })
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc), 'query': get_last_lowcost_query()}), 500
+
+@app.route('/api/stage2/calibrate', methods=['POST'])
+def api_stage2_calibrate():
+    """Ejecuta la calibración optimizada para la ventana seleccionada."""
+    try:
+        payload = request.json or {}
+        devices = normalize_device_list(payload.get('devices'))
+        station_code = payload.get('station_code', 6)
+        start_date = payload.get('start_date', '2023-01-01')
+        end_date = payload.get('end_date', '2023-12-31')
+        window_start = payload.get('window_start')
+        window_end = payload.get('window_end')
+        pollutants = payload.get('pollutants') or ['pm25', 'pm10']
+
+        if not window_start or not window_end:
+            return jsonify({'success': False, 'error': 'Los campos window_start y window_end son obligatorios.'}), 400
+
+        window_start_ts = pd.Timestamp(window_start).tz_localize(None)
+        window_end_ts = pd.Timestamp(window_end).tz_localize(None)
+
+        try:
+            lowcost_window, rmcab_window = prepare_stage2_datasets(
+                devices,
+                station_code,
+                start_date,
+                end_date,
+                window_start_ts,
+                window_end_ts
+            )
+        except ValueError as exc:
+            return jsonify({
+                'success': False,
+                'error': str(exc),
+                'query': get_last_lowcost_query()
+            }), 404
+
+        calibration_results = run_stage2_calibration(
+            lowcost_window,
+            rmcab_window,
+            devices=devices,
+            pollutants=pollutants
+        )
+
+        response_payload = {
+            'success': True,
+            'window': {
+                'start': window_start_ts.isoformat(),
+                'end': window_end_ts.isoformat()
+            },
+            'devices': calibration_results
+        }
+
+        return jsonify(ensure_serializable(response_payload))
+    except Exception as exc:
+        app.logger.exception('Error ejecutando /api/stage2/calibrate')
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+
+@app.route('/api/stage2/download', methods=['POST'])
+def api_stage2_download():
+    """Genera un archivo Excel con los datos de la ventana seleccionada."""
+    try:
+        payload = request.json or {}
+        devices = normalize_device_list(payload.get('devices'))
+        station_code = payload.get('station_code', 6)
+        start_date = payload.get('start_date', '2023-01-01')
+        end_date = payload.get('end_date', '2023-12-31')
+        window_start = payload.get('window_start')
+        window_end = payload.get('window_end')
+
+        if not window_start or not window_end:
+            return jsonify({'success': False, 'error': 'Los campos window_start y window_end son obligatorios.'}), 400
+
+        window_start_ts = pd.Timestamp(window_start).tz_localize(None)
+        window_end_ts = pd.Timestamp(window_end).tz_localize(None)
+
+        try:
+            lowcost_window, rmcab_window = prepare_stage2_datasets(
+                devices,
+                station_code,
+                start_date,
+                end_date,
+                window_start_ts,
+                window_end_ts
+            )
+        except ValueError as exc:
+            return jsonify({
+                'success': False,
+                'error': str(exc),
+                'query': get_last_lowcost_query()
+            }), 400
+
+        device_list = devices
+        if not device_list:
+            if 'device_name' in lowcost_window.columns:
+                device_list = sorted(lowcost_window['device_name'].dropna().astype(str).unique().tolist())
+            else:
+                device_list = []
+
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            for device in device_list:
+                device_df = lowcost_window[lowcost_window['device_name'] == device].copy()
+                if device_df.empty:
+                    continue
+
+                columns = [
+                    col for col in ['datetime', 'device_name', 'pm25_sensor', 'pm10_sensor', 'temperature', 'rh']
+                    if col in device_df.columns
+                ]
+                export_df = device_df[columns].rename(columns={
+                    'datetime': 'timestamp',
+                    'device_name': 'device',
+                    'pm25_sensor': 'pm25_sensor_ugm3',
+                    'pm10_sensor': 'pm10_sensor_ugm3',
+                    'temperature': 'temperature_c',
+                    'rh': 'relative_humidity'
+                })
+                export_df.to_excel(writer, sheet_name=device[:31], index=False)
+
+            rmcab_columns = [
+                col for col in ['datetime', 'pm25', 'pm25_ref', 'pm10', 'pm10_ref']
+                if col in rmcab_window.columns
+            ]
+            if rmcab_columns:
+                rmcab_export = rmcab_window[rmcab_columns].rename(columns={
+                    'datetime': 'timestamp',
+                    'pm25': 'pm25_ref_ugm3',
+                    'pm25_ref': 'pm25_ref_ugm3',
+                    'pm10': 'pm10_ref_ugm3',
+                    'pm10_ref': 'pm10_ref_ugm3'
+                })
+                rmcab_export.to_excel(writer, sheet_name='RMCAB', index=False)
+
+        output.seek(0)
+        filename = f"datos_stage2_{window_start_ts.date()}_{window_end_ts.date()}.xlsx"
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as exc:
+        app.logger.exception('Error generando Excel Stage 2')
+        return jsonify({'success': False, 'error': 'No fue posible generar el archivo Excel.'}), 500
+
+
 @app.route('/api/calibration-summary', methods=['POST'])
 def api_calibration_summary():
     """Genera un resumen de calibración para todos los sensores solicitados"""
     try:
         payload = request.json or {}
-        start_date = payload.get('start_date', '2025-06-01')
-        end_date = payload.get('end_date', '2025-07-31')
-        devices = payload.get('devices') or ['Aire2', 'Aire4', 'Aire5']
+        start_date = payload.get('start_date', '2023-01-01')
+        end_date = payload.get('end_date', '2023-12-31')
+        devices = normalize_device_list(payload.get('devices'))
         pollutants = payload.get('pollutants') or ['pm25', 'pm10']
         station_code = payload.get('station_code', 6)
 
@@ -125,8 +512,12 @@ def api_calibration_summary():
                 'error': 'No se pudieron cargar los datos necesarios para la calibración'
             }), 400
 
+        device_list = devices
+        if not device_list and lowcost_data is not None and not lowcost_data.empty and 'device_name' in lowcost_data.columns:
+            device_list = sorted(lowcost_data['device_name'].dropna().astype(str).unique().tolist())
+
         sensor_summaries = []
-        for device in devices:
+        for device in device_list or []:
             device_data = lowcost_data[lowcost_data['device_name'] == device].copy()
 
             if device_data.empty:
@@ -275,7 +666,7 @@ def api_load_device_data():
         start_date = request.json.get('start_date', '2024-06-01')
         end_date = request.json.get('end_date', '2024-07-31')
 
-        data = load_lowcost_data(start_date, end_date, [device_name])
+        data = load_lowcost_data(start_date, end_date, [device_name], aggregate=False, filter_by_keys=False)
 
         if data is None or data.empty:
             return jsonify({'error': f'No se encontraron datos para {device_name}'}), 404
@@ -302,7 +693,7 @@ def api_calibrate_device():
         if not device_name:
             return jsonify({'error': 'Debe proporcionar el nombre del dispositivo'}), 400
 
-        lowcost_data = load_lowcost_data(start_date, end_date, [device_name])
+        lowcost_data = load_lowcost_data(start_date, end_date, [device_name], aggregate=False, filter_by_keys=False)
         rmcab_data = load_rmcab_data(6, start_date, end_date)  # Las Ferias
 
         if (
@@ -341,7 +732,7 @@ def api_calibrate_device():
 def api_calibrate_multiple_devices():
     """Ejecuta calibración para múltiples dispositivos con múltiples contaminantes"""
     try:
-        devices = request.json.get('devices', ['Aire2', 'Aire4', 'Aire5'])
+        devices = normalize_device_list(request.json.get('devices'))
         start_date = request.json.get('start_date', '2024-06-01')
         end_date = request.json.get('end_date', '2024-07-31')
         pollutants = request.json.get('pollutants', ['pm25'])  # Soportar múltiples contaminantes

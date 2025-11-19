@@ -9,11 +9,15 @@ let calibrationResults = null;
 let activeViewMode = 'single';
 
 const DATE_RANGE = {
-    start: '2025-06-01',
-    end: '2025-07-31'
+    start: '2023-01-01',
+    end: '2023-12-31'
 };
 
 const POLLUTANTS = ['pm25', 'pm10'];  // Agregado PM10
+const POLLUTANT_LABELS = {
+    pm25: 'PM2.5',
+    pm10: 'PM10'
+};
 
 const DEVICE_CONFIG = {
     Aire2: { type: 'sensor', label: 'Sensor Aire2' },
@@ -23,8 +27,32 @@ const DEVICE_CONFIG = {
 };
 
 const DEVICE_ORDER = ['Aire2', 'Aire4', 'Aire5', 'RMCAB_LasFer'];
+const STAGE2_DEVICES = [];
+const STAGE2_WINDOW_DAYS = 5;
 const deviceDataCache = {};
 let currentFriendlyName = '';
+let stage2Section = null;
+let stage2SummaryRow = null;
+let stage2DeviceTableBody = null;
+let stage2CalibrationContainer = null;
+let stage2AlertContainer = null;
+let stage2StartInput = null;
+let stage2EndInput = null;
+let stage2ApplyManualBtn = null;
+
+const STAGE2_DEFAULT_START = '2023-06-22';
+const STAGE2_DEFAULT_END = '2023-06-25';
+
+let stage2State = {
+    window: null,
+    lowcost: [],
+    rmcab: [],
+    autoWindow: null,
+    autoLowcost: [],
+    autoRmcab: [],
+    fullLowcost: [],
+    fullRmcab: []
+};
 
 const SERIES_COLORS = {
     pm25: '#006d77',
@@ -58,6 +86,15 @@ function toNumeric(value) {
     }
     const numberValue = Number(value);
     return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function slugifyId(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
 }
 
 function normalizeDataset(rawData, deviceName = null) {
@@ -99,6 +136,20 @@ document.addEventListener('DOMContentLoaded', () => {
     quickViewButtons = document.querySelectorAll('.quick-view-btn');
     multiSensorSection = document.getElementById('multiSensorSection');
     comparisonSection = document.getElementById('comparisonSection');
+    stage2Section = document.getElementById('stage2Section');
+    stage2SummaryRow = document.getElementById('stage2SummaryRow');
+    stage2DeviceTableBody = document.getElementById('stage2DeviceTableBody');
+    stage2CalibrationContainer = document.getElementById('stage2CalibrationResults');
+    stage2AlertContainer = document.getElementById('stage2AlertContainer');
+    stage2StartInput = document.getElementById('stage2StartDate');
+    stage2EndInput = document.getElementById('stage2EndDate');
+    stage2ApplyManualBtn = document.getElementById('stage2ApplyManualBtn');
+    if (stage2StartInput && !stage2StartInput.value) {
+        stage2StartInput.value = STAGE2_DEFAULT_START;
+    }
+    if (stage2EndInput && !stage2EndInput.value) {
+        stage2EndInput.value = STAGE2_DEFAULT_END;
+    }
 
     // Verificar elementos
     console.log('Elementos del DOM verificados:');
@@ -107,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('  - calibrationSection:', !!calibrationSection);
     console.log('  - comparisonSection:', !!comparisonSection);
     console.log('  - quickViewButtons:', quickViewButtons.length);
+    console.log('  - stage2Section:', !!stage2Section);
     
     // Verificar Plotly
     if (typeof Plotly === 'undefined') {
@@ -163,6 +215,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnLoadDevice) btnLoadDevice.addEventListener('click', () => loadDeviceData());
     if (btnStartCalibration) btnStartCalibration.addEventListener('click', runCalibration);
     if (btnCalibrateAll) btnCalibrateAll.addEventListener('click', runMultipleCalibration);
+    if (stage2ApplyManualBtn) stage2ApplyManualBtn.addEventListener('click', applyManualStage2Window);
+    const stage2CalibrateBtn = document.getElementById('stage2CalibrateBtn');
+    if (stage2CalibrateBtn) {
+        stage2CalibrateBtn.addEventListener('click', runStage2Calibration);
+        console.log('✅ Botón calibración etapa 2 conectado');
+    }
+    const stage2DownloadBtn = document.getElementById('stage2DownloadBtn');
+    if (stage2DownloadBtn) {
+        stage2DownloadBtn.addEventListener('click', downloadStage2Excel);
+        console.log('? Bot�n descarga etapa 2 conectado');
+    }
+    const stage2ReloadBtn = document.getElementById('stage2ReloadBtn');
+    if (stage2ReloadBtn) {
+        stage2ReloadBtn.addEventListener('click', () => showStage2View(true));
+        console.log('✅ Botón recalcular ventana etapa 2 conectado');
+    }
 
     quickViewButtons.forEach(button => {
         button.addEventListener('click', async () => {
@@ -170,6 +238,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isComparison = button.dataset.view === 'comparison';
                 if (isComparison) {
                     await showComparisonView();
+                    setActiveQuickButton(button);
+                    return;
+                }
+
+                const isStage2 = button.dataset.view === 'stage2';
+                if (isStage2) {
+                    await showStage2View();
                     setActiveQuickButton(button);
                     return;
                 }
@@ -254,6 +329,11 @@ async function loadDeviceData(deviceName = null) {
         showAlert("Por favor selecciona un dispositivo primero", "warning");
         return;
     }
+
+    if (stage2Section) {
+        stage2Section.style.display = 'none';
+    }
+    stage2Alert('');
 
     const deviceConfig = DEVICE_CONFIG[targetDevice];
 
@@ -470,6 +550,11 @@ async function showComparisonView() {
     setActiveQuickButton(comparisonButton);
     showLoading('Preparando comparativa de sensores...');
 
+    if (stage2Section) {
+        stage2Section.style.display = 'none';
+    }
+    stage2Alert('');
+
     try {
         const datasets = {};
 
@@ -560,6 +645,1187 @@ function renderComparisonPlots(datasets) {
 
         Plotly.newPlot(container, traces, layout, { responsive: true });
     });
+}
+
+function stage2Alert(message = '', type = 'info') {
+    if (!stage2AlertContainer) {
+        return;
+    }
+    if (!message) {
+        stage2AlertContainer.innerHTML = '';
+        return;
+    }
+    stage2AlertContainer.innerHTML = `
+        <div class="alert alert-${type}" role="alert">
+            ${message}
+        </div>
+    `;
+}
+
+function buildQueryHtml(query) {
+    if (!query) {
+        return '';
+    }
+    const sanitized = String(query)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    return `<pre class="mt-2 small bg-light rounded p-2">${sanitized}</pre>`;
+}
+
+function formatStage2ErrorMessage(result, fallbackMessage = 'Ocurrió un error.') {
+    if (!result) {
+        return fallbackMessage;
+    }
+    const message = result.error || fallbackMessage;
+    const queryHtml = buildQueryHtml(result.query);
+    return `${message}${queryHtml}`;
+}
+
+function logQueryIfAvailable(context, payload) {
+    if (payload && payload.query) {
+        console.warn(`[${context}] Consulta ejecutada:\n${payload.query}`);
+    }
+}
+
+function formatStage2Date(value) {
+    if (!value) {
+        return 'N/D';
+    }
+    const dateObj = new Date(value);
+    if (Number.isNaN(dateObj.getTime())) {
+        return value;
+    }
+    return dateObj.toLocaleString('es-CO', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function formatStage2Number(value, fractionDigits = 0) {
+    const formatter = new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits
+    });
+    if (value === null || value === undefined || Number.isNaN(value)) {
+        return 'N/D';
+    }
+    return formatter.format(value);
+}
+
+function toStage2Date(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function alignLowcostToReference(lowRecords, referenceRecords, toleranceMinutes = 60) {
+    if (!Array.isArray(lowRecords) || !Array.isArray(referenceRecords)) {
+        return [];
+    }
+
+    const toleranceMs = toleranceMinutes * 60 * 1000;
+    const grouped = new Map();
+
+    lowRecords.forEach(record => {
+        const device = record.device_name;
+        if (!device) {
+            return;
+        }
+        const sensorTime = toStage2Date(record.sensor_datetime || record.datetime);
+        if (!sensorTime) {
+            return;
+        }
+        const clone = { ...record, __sensor_ts: sensorTime };
+        grouped.set(device, (grouped.get(device) || []).concat(clone));
+    });
+
+    grouped.forEach(list => list.sort((a, b) => a.__sensor_ts - b.__sensor_ts));
+
+    const aligned = [];
+    referenceRecords.forEach(ref => {
+        const refTs = toStage2Date(ref.datetime);
+        if (!refTs) {
+            return;
+        }
+        grouped.forEach((records, device) => {
+            let closest = null;
+            let closestDiff = Infinity;
+            for (const entry of records) {
+                const diff = Math.abs(entry.__sensor_ts - refTs);
+                if (diff < closestDiff) {
+                    closestDiff = diff;
+                    closest = entry;
+                    if (diff === 0) {
+                        break;
+                    }
+                } else if (entry.__sensor_ts > refTs && diff > closestDiff) {
+                    break;
+                }
+            }
+            if (closest && closestDiff <= toleranceMs) {
+                const { __sensor_ts, ...rest } = closest;
+                aligned.push({
+                    ...rest,
+                    datetime: ref.datetime,
+                    reference_datetime: ref.datetime,
+                    sensor_datetime: closest.sensor_datetime || closest.datetime || __sensor_ts.toISOString(),
+                    time_diff_ms: closestDiff,
+                    device_name: device
+                });
+            }
+        });
+    });
+
+    return aligned;
+}
+
+function buildStage2DeviceSummary(alignedRecords) {
+    const summaryMap = new Map();
+    const ensureEntry = (device) => {
+        if (!summaryMap.has(device)) {
+            summaryMap.set(device, {
+                device,
+                label: DEVICE_CONFIG[device]?.label || device,
+                records: 0,
+                pm25: 0,
+                pm10: 0
+            });
+        }
+        return summaryMap.get(device);
+    };
+
+    alignedRecords.forEach(record => {
+        const device = record.device_name;
+        if (!device) {
+            return;
+        }
+        const entry = ensureEntry(device);
+        entry.records += 1;
+        if (record.pm25_sensor !== null && record.pm25_sensor !== undefined && record.pm25_sensor !== '') {
+            entry.pm25 += 1;
+        }
+        if (record.pm10_sensor !== null && record.pm10_sensor !== undefined && record.pm10_sensor !== '') {
+            entry.pm10 += 1;
+        }
+    });
+
+    return Array.from(summaryMap.values()).sort((a, b) => {
+        if (b.records !== a.records) {
+            return b.records - a.records;
+        }
+        return a.label.localeCompare(b.label);
+    });
+}
+
+function renderStage2Summary(windowInfo) {
+    if (!stage2SummaryRow) {
+        return;
+    }
+    if (!windowInfo) {
+        stage2SummaryRow.innerHTML = '';
+        return;
+    }
+
+    const cards = [
+        {
+            icon: 'bi-calendar-event',
+            title: 'Inicio ventana',
+            value: formatStage2Date(windowInfo.start_date || windowInfo.start)
+        },
+        {
+            icon: 'bi-calendar4-event',
+            title: 'Fin ventana',
+            value: formatStage2Date(windowInfo.end_date || windowInfo.end)
+        },
+        {
+            icon: 'bi-collection',
+            title: 'Registros totales',
+            value: formatStage2Number(windowInfo.total_records || 0)
+        },
+        {
+            icon: 'bi-clock-history',
+            title: 'Horas con datos',
+            value: formatStage2Number(windowInfo.hours_covered || 0)
+        }
+    ];
+
+    stage2SummaryRow.innerHTML = cards.map(card => `
+        <div class="col-md-3 col-sm-6">
+            <div class="metric-card h-100">
+                <i class="bi ${card.icon} display-6 text-primary"></i>
+                <h4>${card.value}</h4>
+                <p class="text-muted mb-0">${card.title}</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderStage2DeviceTable(perDevice = []) {
+    if (!stage2DeviceTableBody) {
+        return;
+    }
+
+    if (!Array.isArray(perDevice) || perDevice.length === 0) {
+        stage2DeviceTableBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-muted">Sin información disponible.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    stage2DeviceTableBody.innerHTML = perDevice.map(device => `
+        <tr>
+            <td><strong>${device.label || device.device}</strong></td>
+            <td>${formatStage2Number(device.records)}</td>
+            <td>${formatStage2Number(device.pm25)}</td>
+            <td>${formatStage2Number(device.pm10)}</td>
+        </tr>
+    `).join('');
+}
+
+function buildStage2HoverMetadata(row) {
+    if (!row) {
+        return ['N/D', 'N/D', 'Ajuste no disponible'];
+    }
+
+    const referenceDate = toStage2Date(row.datetime);
+    const sensorDate = toStage2Date(row.sensor_datetime || row.datetime);
+    const referenceLabel = referenceDate ? formatStage2Date(referenceDate) : 'N/D';
+    const sensorLabel = sensorDate ? formatStage2Date(sensorDate) : 'N/D';
+
+    let adjustmentLabel = 'Ajuste no disponible';
+
+    if (referenceDate && sensorDate) {
+        const diffMinutes = (sensorDate.getTime() - referenceDate.getTime()) / 60000;
+        if (Number.isFinite(diffMinutes)) {
+            if (Math.abs(diffMinutes) < 0.01) {
+                adjustmentLabel = '0 min (sin ajuste)';
+            } else {
+                const direction = diffMinutes > 0 ? 'sensor adelantado' : 'sensor atrasado';
+                const signedValue = diffMinutes > 0 ? `+${diffMinutes.toFixed(1)}` : diffMinutes.toFixed(1);
+                adjustmentLabel = `${signedValue} min (${direction})`;
+            }
+        }
+    } else if (sensorDate && !referenceDate) {
+        adjustmentLabel = 'Sin referencia';
+    } else if (referenceDate && !sensorDate) {
+        adjustmentLabel = 'Sin dato del sensor';
+    }
+
+    return [referenceLabel, sensorLabel, adjustmentLabel];
+}
+
+function createStage2PollutantTrace(records, fieldName, label, color) {
+    if (!Array.isArray(records)) {
+        return null;
+    }
+
+    const points = records
+        .filter(row => row && row[fieldName] !== null && row[fieldName] !== undefined)
+        .map(row => {
+            const numericValue = toNumeric(row[fieldName]);
+            if (numericValue === null) {
+                return null;
+            }
+            return {
+                x: row.datetime,
+                y: numericValue,
+                metadata: buildStage2HoverMetadata(row)
+            };
+        })
+        .filter(point => point !== null);
+
+    if (!points.length) {
+        return null;
+    }
+
+    return {
+        x: points.map(point => point.x),
+        y: points.map(point => point.y),
+        customdata: points.map(point => point.metadata),
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: label,
+        line: { color, width: 2 },
+        marker: { size: 5 },
+        hovertemplate: [
+            'Fecha referencia: %{customdata[0]}',
+            'Fecha real del sensor: %{customdata[1]}',
+            'Ajuste aplicado: %{customdata[2]}',
+            `${label}: %{y:.2f} ug/m3`,
+            '<extra></extra>'
+        ].join('<br>')
+    };
+}
+
+function computeStage2WindowData(startISO, endISO) {
+    if (!startISO || !endISO) {
+        return null;
+    }
+
+    const startBoundary = new Date(startISO);
+    startBoundary.setHours(0, 0, 0, 0);
+    const endBoundary = new Date(endISO);
+    endBoundary.setHours(23, 0, 0, 0);
+
+    if (Number.isNaN(startBoundary.getTime()) || Number.isNaN(endBoundary.getTime()) || startBoundary > endBoundary) {
+        return null;
+    }
+
+    const parseTimestamp = (value) => {
+        const ts = new Date(value);
+        return Number.isNaN(ts.getTime()) ? null : ts;
+    };
+
+    const lowcostFiltered = (stage2State.fullLowcost || []).filter(row => {
+        const ts = parseTimestamp(row.sensor_datetime || row.datetime);
+        return ts && ts >= startBoundary && ts <= endBoundary;
+    });
+
+    const rmcabFiltered = (stage2State.fullRmcab || []).filter(row => {
+        const ts = parseTimestamp(row.datetime);
+        return ts && ts >= startBoundary && ts <= endBoundary;
+    });
+
+    if (!lowcostFiltered.length || !rmcabFiltered.length) {
+        return null;
+    }
+
+    const alignedRecords = alignLowcostToReference(lowcostFiltered, rmcabFiltered, 60);
+    if (!alignedRecords.length) {
+        return null;
+    }
+
+    const perDevice = buildStage2DeviceSummary(alignedRecords);
+    const hourSet = new Set(
+        alignedRecords
+            .map(row => parseTimestamp(row.datetime))
+            .filter(Boolean)
+            .map(date => date.toISOString().slice(0, 13))
+    );
+
+    const stationInfo = stage2State.autoWindow?.station || stage2State.window?.station || null;
+
+    return {
+        window: {
+            start: startBoundary.toISOString(),
+            end: endBoundary.toISOString(),
+            start_date: startISO,
+            end_date: endISO,
+            total_records: alignedRecords.length,
+            hours_covered: hourSet.size,
+            per_device: perDevice,
+            station: stationInfo
+        },
+        lowcost: alignedRecords,
+        rmcab: rmcabFiltered
+    };
+}
+
+function applyStage2Window(startISO, endISO, showMessage = true) {
+    const computed = computeStage2WindowData(startISO, endISO);
+    if (!computed) {
+        if (showMessage) {
+            stage2Alert('No hay datos disponibles para la ventana seleccionada.', 'warning');
+        }
+        return false;
+    }
+
+    stage2State.window = computed.window;
+    stage2State.lowcost = computed.lowcost;
+    stage2State.rmcab = computed.rmcab;
+
+    renderStage2Summary(stage2State.window);
+    renderStage2DeviceTable(stage2State.window.per_device || []);
+    renderStage2Charts(stage2State.lowcost, stage2State.rmcab);
+
+    if (showMessage) {
+        stage2Alert(`Ventana aplicada (${startISO} a ${endISO}).`, 'success');
+    } else {
+        stage2Alert('');
+    }
+
+    return true;
+}
+
+function applyManualStage2Window() {
+    if (!stage2StartInput || !stage2EndInput) {
+        return;
+    }
+
+    const startValue = stage2StartInput.value;
+    const endValue = stage2EndInput.value;
+
+    if (!startValue || !endValue) {
+        stage2Alert('Selecciona una fecha inicial y final antes de aplicar la ventana.', 'warning');
+        return;
+    }
+
+    if (new Date(startValue) > new Date(endValue)) {
+        stage2Alert('La fecha final debe ser posterior a la fecha inicial.', 'warning');
+        return;
+    }
+
+    if (!stage2State.fullLowcost.length) {
+        stage2Alert('Recalcula la ventana antes de aplicar un rango manual.', 'warning');
+        return;
+    }
+
+    const applied = applyStage2Window(startValue, endValue, true);
+    if (!applied) {
+        if (stage2State.autoWindow && stage2State.autoLowcost.length) {
+            stage2State.window = stage2State.autoWindow;
+            stage2State.lowcost = stage2State.autoLowcost.slice();
+            stage2State.rmcab = stage2State.autoRmcab.slice();
+            renderStage2Summary(stage2State.window);
+            renderStage2DeviceTable(stage2State.window.per_device || []);
+            renderStage2Charts(stage2State.lowcost, stage2State.rmcab);
+        }
+        return;
+    }
+
+    if (stage2Section) {
+        stage2Section.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+
+function getStage2DevicesWithData(minRecords = 1) {
+    if (!stage2State.window || !Array.isArray(stage2State.window.per_device)) {
+        return [];
+    }
+
+    return stage2State.window.per_device
+        .filter(item => (item.records || 0) >= minRecords)
+        .map(item => item.device);
+}
+
+function renderStage2Charts(lowcostRecords = [], rmcabRecords = []) {
+    const plotConfigs = [
+        { device: 'Aire2', title: 'Aire2 - PM2.5 y PM10', container: 'stage2ChartAire2' },
+        { device: 'Aire4', title: 'Aire4 - PM2.5 y PM10', container: 'stage2ChartAire4' },
+        { device: 'Aire5', title: 'Aire5 - PM2.5 y PM10', container: 'stage2ChartAire5' }
+    ];
+
+    plotConfigs.forEach(cfg => {
+        const container = document.getElementById(cfg.container);
+        if (!container) {
+            return;
+        }
+
+        const deviceData = (lowcostRecords || []).filter(row => row.device_name === cfg.device);
+        if (!deviceData.length) {
+            container.innerHTML = '<p class="text-muted text-center mb-0">Sin datos disponibles.</p>';
+            if (window.Plotly) {
+                Plotly.purge(container);
+            }
+            return;
+        }
+
+        deviceData.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+        const timestamps = deviceData.map(row => row.datetime);
+
+        const traces = [];
+
+        const pm25Trace = createStage2PollutantTrace(deviceData, 'pm25_sensor', 'PM2.5', SERIES_COLORS.pm25);
+        if (pm25Trace) {
+            traces.push(pm25Trace);
+        }
+
+        const pm10Trace = createStage2PollutantTrace(deviceData, 'pm10_sensor', 'PM10', SERIES_COLORS.pm10);
+        if (pm10Trace) {
+            traces.push(pm10Trace);
+        }
+
+        const minX = timestamps[0];
+        const maxX = timestamps[timestamps.length - 1];
+
+        traces.push({
+            x: [minX, maxX],
+            y: [15, 15],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'OMS PM2.5 (15)',
+            line: { color: '#f4a261', dash: 'dash' },
+            hoverinfo: 'skip'
+        });
+
+        traces.push({
+            x: [minX, maxX],
+            y: [25, 25],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Colombia PM2.5 (25)',
+            line: { color: '#e76f51', dash: 'dashdot' },
+            hoverinfo: 'skip'
+        });
+
+        traces.push({
+            x: [minX, maxX],
+            y: [45, 45],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'OMS PM10 (45)',
+            line: { color: '#0ea5e9', dash: 'dot' },
+            hoverinfo: 'skip'
+        });
+
+        traces.push({
+            x: [minX, maxX],
+            y: [50, 50],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Colombia PM10 (50)',
+            line: { color: '#2563eb', dash: 'dot' },
+            hoverinfo: 'skip'
+        });
+
+        const layout = {
+            title: cfg.title,
+            margin: { t: 45, r: 20, l: 60, b: 80 },
+            hovermode: 'x unified',
+            showlegend: true,
+            legend: { orientation: 'h', y: -0.35 },
+            xaxis: { title: 'Fecha y hora' },
+            yaxis: { title: 'µg/m³' }
+        };
+
+        if (window.Plotly) {
+            Plotly.react(container, traces, layout, { responsive: true, displaylogo: false });
+        }
+    });
+
+    const rmcabContainer = document.getElementById('stage2ChartRMCAB');
+    if (rmcabContainer) {
+        const records = (rmcabRecords || []).slice().sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+        if (!records.length) {
+            rmcabContainer.innerHTML = '<p class="text-muted text-center mb-0">Sin datos disponibles.</p>';
+            if (window.Plotly) {
+                Plotly.purge(rmcabContainer);
+            }
+        } else if (window.Plotly) {
+            const timestamps = records.map(row => row.datetime);
+            const pm25Values = records.map(row => toNumeric(row.pm25));
+            const pm10Values = records.map(row => toNumeric(row.pm10));
+
+            const traces = [];
+            const minX = timestamps[0];
+            const maxX = timestamps[timestamps.length - 1];
+            if (pm25Values.some(val => val !== null)) {
+                traces.push({
+                    x: timestamps,
+                    y: pm25Values,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'PM2.5',
+                    line: { color: SERIES_COLORS.pm25, width: 2 },
+                    marker: { size: 5 }
+                });
+            }
+            if (pm10Values.some(val => val !== null)) {
+                traces.push({
+                    x: timestamps,
+                    y: pm10Values,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'PM10',
+                    line: { color: SERIES_COLORS.pm10, width: 2 },
+                    marker: { size: 5 }
+                });
+            }
+
+            traces.push({
+                x: [minX, maxX],
+                y: [15, 15],
+                type: 'scatter',
+                mode: 'lines',
+                name: 'OMS PM2.5 (15)',
+                line: { color: '#f4a261', dash: 'dash' },
+                hoverinfo: 'skip'
+            });
+
+            traces.push({
+                x: [minX, maxX],
+                y: [25, 25],
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Colombia PM2.5 (25)',
+                line: { color: '#e76f51', dash: 'dashdot' },
+                hoverinfo: 'skip'
+            });
+
+            traces.push({
+                x: [minX, maxX],
+                y: [45, 45],
+                type: 'scatter',
+                mode: 'lines',
+                name: 'OMS PM10 (45)',
+                line: { color: '#0ea5e9', dash: 'dot' },
+                hoverinfo: 'skip'
+            });
+
+            traces.push({
+                x: [minX, maxX],
+                y: [50, 50],
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Colombia PM10 (50)',
+                line: { color: '#2563eb', dash: 'dot' },
+                hoverinfo: 'skip'
+            });
+
+            const layout = {
+                title: 'RMCAB Las Ferias - PM2.5 y PM10',
+                margin: { t: 45, r: 20, l: 60, b: 80 },
+                hovermode: 'x unified',
+                showlegend: true,
+                legend: { orientation: 'h', y: -0.35 },
+                xaxis: { title: 'Fecha y hora' },
+                yaxis: { title: 'µg/m³' }
+            };
+
+            Plotly.react(rmcabContainer, traces, layout, { responsive: true, displaylogo: false });
+        }
+    }
+}
+
+async function showStage2View(forceReload = false) {
+    activeViewMode = 'stage2';
+
+    if (dataSection) dataSection.style.display = 'none';
+    if (calibrationSection) calibrationSection.style.display = 'none';
+    if (multiSensorSection) multiSensorSection.style.display = 'none';
+    if (comparisonSection) comparisonSection.style.display = 'none';
+    const predictionSection = document.getElementById('predictionSection');
+    if (predictionSection) predictionSection.style.display = 'none';
+
+    if (stage2Section) stage2Section.style.display = 'block';
+
+    if (!forceReload && stage2State.window && stage2State.lowcost.length) {
+        if (stage2StartInput && stage2State.window.start_date) {
+            stage2StartInput.value = stage2State.window.start_date;
+        }
+        if (stage2EndInput && stage2State.window.end_date) {
+            stage2EndInput.value = stage2State.window.end_date;
+        }
+        renderStage2Summary(stage2State.window);
+        renderStage2DeviceTable(stage2State.window.per_device || []);
+        renderStage2Charts(stage2State.lowcost, stage2State.rmcab);
+        stage2Alert('');
+        stage2Section.scrollIntoView({ behavior: 'smooth' });
+        return;
+    }
+
+    if (forceReload) {
+        stage2State = {
+            window: null,
+            lowcost: [],
+            rmcab: [],
+            autoWindow: null,
+            autoLowcost: [],
+            autoRmcab: [],
+            fullLowcost: [],
+            fullRmcab: []
+        };
+    }
+
+    showLoading(`Buscando ventana óptima de ${STAGE2_WINDOW_DAYS} días...`);
+    stage2Alert('');
+
+    try {
+        const stage2Payload = {
+            start_date: DATE_RANGE.start,
+            end_date: DATE_RANGE.end,
+            station_code: DEVICE_CONFIG.RMCAB_LasFer.station,
+            window_days: STAGE2_WINDOW_DAYS
+        };
+        if (Array.isArray(STAGE2_DEVICES) && STAGE2_DEVICES.length > 0) {
+            stage2Payload.devices = STAGE2_DEVICES;
+        }
+
+        const response = await fetch('/api/stage2/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(stage2Payload)
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+            logQueryIfAvailable('Stage2 Load', result);
+            stage2Alert(
+                formatStage2ErrorMessage(result, 'No fue posible calcular la ventana óptima.'),
+                'danger'
+            );
+            renderStage2Summary(null);
+            renderStage2DeviceTable([]);
+            renderStage2Charts([], []);
+            return;
+        }
+
+        // Mostrar consulta SQL ejecutada (si está disponible)
+        try {
+            const queryBox = document.getElementById('stage2QueryBox');
+            if (queryBox) {
+                const build = (window.buildQueryHtml || (q => `<pre class=\"mt-2 small bg-light rounded p-2\">${String(q || '(consulta no disponible)')}</pre>`));
+                queryBox.innerHTML = build(result.query || '(consulta no disponible)');
+            }
+        } catch (e) {
+            console.warn('No fue posible mostrar la consulta ejecutada', e);
+        }
+
+        stage2State.autoWindow = result.window || null;
+        stage2State.autoLowcost = (result.lowcost || []).slice();
+        stage2State.autoRmcab = (result.rmcab || []).slice();
+        stage2State.fullLowcost = (result.full_lowcost || result.lowcost || []).slice();
+        stage2State.fullRmcab = (result.full_rmcab || result.rmcab || []).slice();
+        stage2State.window = stage2State.autoWindow;
+        stage2State.lowcost = stage2State.autoLowcost.slice();
+        stage2State.rmcab = stage2State.autoRmcab.slice();
+
+        if (stage2StartInput) {
+            stage2StartInput.value = STAGE2_DEFAULT_START;
+        }
+        if (stage2EndInput) {
+            stage2EndInput.value = STAGE2_DEFAULT_END;
+        }
+
+        let manualApplied = false;
+        let autoApplied = false;
+
+        if (stage2StartInput && stage2EndInput) {
+            manualApplied = applyStage2Window(stage2StartInput.value, stage2EndInput.value, false);
+        }
+
+        if (!manualApplied && stage2State.autoWindow) {
+            const autoStart = stage2State.autoWindow.start ? stage2State.autoWindow.start.slice(0, 10) : '';
+            const autoEnd = stage2State.autoWindow.end ? stage2State.autoWindow.end.slice(0, 10) : '';
+            if (autoStart) {
+                if (stage2StartInput) stage2StartInput.value = autoStart;
+                if (stage2EndInput) stage2EndInput.value = autoEnd;
+                autoApplied = applyStage2Window(autoStart, autoEnd, false);
+            }
+        }
+
+        if (manualApplied) {
+            stage2Alert(`Ventana manual aplicada (${stage2StartInput.value} a ${stage2EndInput.value}).`, 'success');
+        } else if (autoApplied) {
+            stage2Alert('Ventana automática identificada correctamente.', 'success');
+        } else {
+            stage2Alert('No se encontraron datos en la ventana seleccionada. Ajusta las fechas manualmente.', 'warning');
+            renderStage2Summary(null);
+            renderStage2DeviceTable([]);
+            renderStage2Charts([], []);
+        }
+
+        if ((manualApplied || autoApplied) && stage2Section) {
+            stage2Section.scrollIntoView({ behavior: 'smooth' });
+        }
+    } catch (error) {
+        console.error('Error cargando etapa 2:', error);
+        stage2Alert('Ocurrió un error calculando la ventana óptima.', 'danger');
+        renderStage2Summary(null);
+        renderStage2DeviceTable([]);
+        renderStage2Charts([], []);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function runStage2Calibration() {
+    if (!stage2State.window) {
+        stage2Alert('Primero recalcula la ventana óptima antes de calibrar.', 'warning');
+        return;
+    }
+    if (!stage2State.lowcost || !stage2State.lowcost.length) {
+        stage2Alert('No hay datos disponibles en la ventana seleccionada. Ajusta el rango y vuelve a intentarlo.', 'warning');
+        return;
+    }
+
+    showLoading('Ejecutando calibración avanzada...');
+    stage2Alert('');
+
+    try {
+        const devicesForCalibration = getStage2DevicesWithData();
+
+        if (!devicesForCalibration.length) {
+            stage2Alert('No hay dispositivos con datos suficientes en la ventana seleccionada.', 'warning');
+            return;
+        }
+
+        const response = await fetch('/api/stage2/calibrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                start_date: DATE_RANGE.start,
+                end_date: DATE_RANGE.end,
+                window_start: stage2State.window.start,
+                window_end: stage2State.window.end,
+                devices: devicesForCalibration,
+                pollutants: POLLUTANTS,
+                station_code: DEVICE_CONFIG.RMCAB_LasFer.station
+            })
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+            logQueryIfAvailable('Stage2 Calibrate', result);
+            stage2Alert(
+                formatStage2ErrorMessage(result, 'No fue posible ejecutar la calibración.'),
+                'danger'
+            );
+            return;
+        }
+
+        renderStage2CalibrationResults(result.devices || []);
+        stage2Alert('Calibración completada correctamente.', 'success');
+    } catch (error) {
+        console.error('Error en calibración etapa 2:', error);
+        stage2Alert('Ocurrió un error ejecutando la calibración.', 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function downloadStage2Excel() {
+    if (!stage2State.window) {
+        stage2Alert('Primero recalcula la ventana óptima para definir el rango a descargar.', 'warning');
+        return;
+    }
+
+    const devicesForDownload = getStage2DevicesWithData();
+    if (!devicesForDownload.length) {
+        stage2Alert('No hay dispositivos con datos suficientes en la ventana seleccionada.', 'warning');
+        return;
+    }
+
+    showLoading('Generando archivo Excel...');
+    stage2Alert('');
+
+    try {
+        const response = await fetch('/api/stage2/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                start_date: DATE_RANGE.start,
+                end_date: DATE_RANGE.end,
+                window_start: stage2State.window.start,
+                window_end: stage2State.window.end,
+                devices: devicesForDownload,
+                station_code: DEVICE_CONFIG.RMCAB_LasFer.station
+            })
+        });
+
+        if (!response.ok) {
+            let errorMessage = 'No fue posible generar el archivo.';
+            const contentType = response.headers.get('Content-Type') || '';
+            let errorPayload = null;
+            if (contentType.includes('application/json')) {
+                try {
+                    errorPayload = await response.json();
+                    errorMessage = errorPayload.error || errorMessage;
+                } catch (jsonError) {
+                    console.warn('No se pudo leer la respuesta de error:', jsonError);
+                }
+            }
+            logQueryIfAvailable('Stage2 Download', errorPayload);
+            stage2Alert(
+                formatStage2ErrorMessage(errorPayload, errorMessage),
+                'danger'
+            );
+            return;
+        }
+
+        const blob = await response.blob();
+        if (!blob || blob.size === 0) {
+            stage2Alert('El archivo descargado está vacío.', 'warning');
+            return;
+        }
+
+        const disposition = response.headers.get('Content-Disposition') || '';
+        let filename = 'datos_stage2.xlsx';
+        const match = disposition.match(/filename="?([^";]+)"?/i);
+        if (match && match[1]) {
+            filename = match[1];
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+
+        stage2Alert('Archivo Excel descargado correctamente.', 'success');
+    } catch (error) {
+        console.error('Error descargando Excel Stage 2:', error);
+        stage2Alert('Ocurrió un error generando el archivo.', 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+function renderStage2CalibrationResults(deviceResults = []) {
+    if (!stage2CalibrationContainer) {
+        return;
+    }
+
+    if (!deviceResults.length) {
+        stage2CalibrationContainer.innerHTML = `
+            <p class="text-muted text-center">Ejecuta la calibración para visualizar resultados.</p>
+        `;
+        return;
+    }
+
+    const accordionId = 'stage2CalibrationAccordion';
+    const scatterTasks = [];
+    let html = `<div class="accordion" id="${accordionId}">`;
+
+    deviceResults.forEach((deviceResult, deviceIndex) => {
+        const deviceLabel = DEVICE_CONFIG[deviceResult.device]?.label || deviceResult.device;
+        const headingId = `stage2Heading${deviceIndex}`;
+        const collapseId = `stage2Collapse${deviceIndex}`;
+        const isFirst = deviceIndex === 0;
+
+        let bodyHtml = '';
+        const deviceWarnings = (deviceResult.warnings || []).filter(Boolean);
+        const deviceWarningsHtml = deviceWarnings.length
+            ? `
+                <div class="alert alert-warning">
+                    <strong>Advertencias generales (${deviceLabel}):</strong>
+                    <ul class="mb-0">${deviceWarnings.map(msg => `<li>${msg}</li>`).join('')}</ul>
+                </div>
+            `
+            : '';
+
+        if (deviceResult.error) {
+            bodyHtml = `<div class="alert alert-warning mb-0">${deviceResult.error}</div>`;
+        } else {
+            const pollutants = Object.keys(deviceResult.pollutants || {});
+            if (!pollutants.length) {
+                bodyHtml = '<p class="text-muted mb-0">Sin resultados disponibles.</p>';
+            } else {
+                pollutants.forEach(pollutantKey => {
+                    const sectionHtml = buildStage2PollutantSection(
+                        deviceResult.device,
+                        pollutantKey,
+                        deviceResult.pollutants[pollutantKey],
+                        scatterTasks
+                    );
+                    bodyHtml += sectionHtml;
+                });
+            }
+        }
+
+        bodyHtml = deviceWarningsHtml + bodyHtml;
+
+        html += `
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="${headingId}">
+                    <button class="accordion-button ${isFirst ? '' : 'collapsed'}" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#${collapseId}"
+                            aria-expanded="${isFirst}" aria-controls="${collapseId}">
+                        ${deviceLabel}
+                    </button>
+                </h2>
+                <div id="${collapseId}" class="accordion-collapse collapse ${isFirst ? 'show' : ''}"
+                     data-bs-parent="#${accordionId}">
+                    <div class="accordion-body">
+                        ${bodyHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    stage2CalibrationContainer.innerHTML = html;
+
+    scatterTasks.forEach(task => plotStage2Scatter(task));
+}
+
+function buildStage2PollutantSection(deviceName, pollutantKey, data, scatterTasks) {
+    const label = POLLUTANT_LABELS[pollutantKey] || pollutantKey.toUpperCase();
+
+    if (!data || data.error) {
+        return `<div class="alert alert-warning">${data?.error || 'Sin datos de calibración disponibles.'}</div>`;
+    }
+
+    const warningsList = (data.warnings || []).filter(Boolean);
+    const warningsHtml = warningsList.length
+        ? `
+            <div class="alert alert-warning mb-3">
+                <strong>Advertencias:</strong>
+                <ul class="mb-0">${warningsList.map(item => `<li>${item}</li>`).join('')}</ul>
+            </div>
+        `
+        : '';
+
+    const metricsRows = (data.metrics || []).map(model => {
+        const rowClass = model.is_best ? 'table-success' : '';
+        return `
+            <tr class="${rowClass}">
+                <td><strong>${model.model_name}</strong>${model.is_best ? ' <span class="badge bg-success ms-2">Mejor</span>' : ''}</td>
+                <td>${model.r2?.toFixed(4) ?? 'N/D'}</td>
+                <td>${model.r2_adjusted?.toFixed(4) ?? 'N/D'}</td>
+                <td>${model.rmse?.toFixed(3) ?? 'N/D'}</td>
+                <td>${model.mae?.toFixed(3) ?? 'N/D'}</td>
+                <td>${model.mape?.toFixed(2) ?? 'N/D'}</td>
+            </tr>
+        `;
+    }).join('') || `
+        <tr>
+            <td colspan="6" class="text-center text-muted">No se generaron métricas para este contaminante.</td>
+        </tr>
+    `;
+
+    const bestMetrics = data.best_metrics || {};
+    const linearModelInfo = data.linear_model?.formula ? `
+        <div class="alert alert-secondary mb-3">
+            <strong>Fórmula Regresión Lineal:</strong><br>
+            <code>${data.linear_model.formula}</code>
+        </div>
+    ` : '';
+
+    const scatterHtmlParts = [];
+    (data.scatter || []).forEach((modelData, index) => {
+        const chartId = `stage2-scatter-${slugifyId(deviceName)}-${slugifyId(pollutantKey)}-${index}`;
+        scatterHtmlParts.push(`
+            <div class="col-lg-6">
+                <div class="plot-container">
+                    <h6>${modelData.model_name}</h6>
+                    <div id="${chartId}" style="min-height: 320px;"></div>
+                </div>
+            </div>
+        `);
+        scatterTasks.push({
+            containerId: chartId,
+            modelName: modelData.model_name,
+            pollutantLabel: label,
+            points: modelData.points || []
+        });
+    });
+
+    const scatterHtml = scatterHtmlParts.length
+        ? `<div class="row g-3">${scatterHtmlParts.join('')}</div>`
+        : '<p class="text-muted">No se encontraron datos de dispersión.</p>';
+
+    return `
+        <div class="stage2-pollutant mb-4">
+            <h5 class="fw-bold mb-3">${label}</h5>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <i class="bi bi-collection-play display-6 text-primary"></i>
+                        <h4>${formatStage2Number(data.records)}</h4>
+                        <p class="text-muted mb-0">Registros totales</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <i class="bi bi-check-circle display-6 text-success"></i>
+                        <h4>${formatStage2Number(data.records_after_cleaning)}</h4>
+                        <p class="text-muted mb-0">Después de limpieza</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <i class="bi bi-slash-circle display-6 text-warning"></i>
+                        <h4>${formatStage2Number(data.outliers_removed)}</h4>
+                        <p class="text-muted mb-0">Outliers eliminados</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <i class="bi bi-award display-6 text-info"></i>
+                        <h4>${bestMetrics.model_name || 'N/D'}</h4>
+                        <p class="text-muted mb-0">Mejor modelo (R²: ${bestMetrics.r2?.toFixed(3) ?? 'N/D'})</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="plot-container mb-3">
+                <h6>Comparación de modelos</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Modelo</th>
+                                <th>R²</th>
+                                <th>R² Ajustado</th>
+                                <th>RMSE</th>
+                                <th>MAE</th>
+                                <th>MAPE (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>${metricsRows}</tbody>
+                    </table>
+                </div>
+            </div>
+
+            ${linearModelInfo}
+            ${warningsHtml}
+            ${scatterHtml}
+        </div>
+    `;
+}
+
+function plotStage2Scatter({ containerId, modelName, pollutantLabel, points }) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        return;
+    }
+
+    if (!Array.isArray(points) || !points.length) {
+        container.innerHTML = '<p class="text-muted text-center mb-0">Sin datos disponibles.</p>';
+        if (window.Plotly) {
+            Plotly.purge(container);
+        }
+        return;
+    }
+
+    const actualValues = points.map(point => point.actual);
+    const predictedValues = points.map(point => point.predicted);
+
+    if (window.Plotly) {
+        const lineMin = Math.min(...actualValues, ...predictedValues);
+        const lineMax = Math.max(...actualValues, ...predictedValues);
+
+        const scatterTrace = {
+            x: actualValues,
+            y: predictedValues,
+            mode: 'markers',
+            type: 'scatter',
+            name: 'Predicciones',
+            marker: { color: '#1d4ed8', size: 8, opacity: 0.7 }
+        };
+
+        const perfectLine = {
+            x: [lineMin, lineMax],
+            y: [lineMin, lineMax],
+            mode: 'lines',
+            type: 'scatter',
+            name: 'Línea ideal',
+            line: { color: '#ef4444', dash: 'dash', width: 2 },
+            hoverinfo: 'skip'
+        };
+
+        const layout = {
+            margin: { t: 50, r: 30, l: 60, b: 60 },
+            title: `${modelName} - ${pollutantLabel}`,
+            xaxis: { title: `${pollutantLabel} real (µg/m³)` },
+            yaxis: { title: `${pollutantLabel} predicho (µg/m³)` },
+            showlegend: true,
+            legend: { x: 0.02, y: 0.98 }
+        };
+
+        Plotly.react(container, [scatterTrace, perfectLine], layout, { responsive: true, displaylogo: false });
+    }
 }
 
 /**
@@ -2012,3 +3278,5 @@ function showAlert(message, type = 'info') {
     console.log(`[${type.toUpperCase()}] ${message}`);
     // Aquí podrías implementar un sistema de notificaciones más elaborado
 }
+
+

@@ -42,77 +42,267 @@ RMCAB_STATION_INFO = {
     }
 }
 
+LAST_LOW_COST_QUERY = ""
 
-def load_lowcost_data(start_date='2024-06-01', end_date='2024-07-31', devices=None):
+
+def get_last_lowcost_query(default_message='(sin consulta registrada)'):
+    return LAST_LOW_COST_QUERY or default_message
+
+
+def load_lowcost_data(start_date='2024-06-01', end_date='2024-07-31', devices=None, aggregate=True, filter_by_keys=True):
     """
     Carga datos de sensores de bajo costo desde PostgreSQL
 
     Args:
         start_date: Fecha inicial (formato YYYY-MM-DD)
         end_date: Fecha final (formato YYYY-MM-DD)
-        devices: Lista de dispositivos (default: ['Aire2', 'Aire4', 'Aire5'])
+        devices: Lista de dispositivos (opcional). Si es None, incluye todos.
 
     Returns:
         DataFrame con columnas: datetime, device_name, pm25, pm10, temperature, rh
     """
-    if devices is None:
-        devices = ['Aire2', 'Aire4', 'Aire5']
+    if isinstance(devices, str):
+        devices = [devices]
+    if devices:
+        devices = [str(dev).strip() for dev in devices if dev]
+        if not devices:
+            devices = None
 
     try:
         # Conectar a PostgreSQL
         conn = psycopg2.connect(**DB_CONFIG)
 
-        # Construir lista de dispositivos para SQL
-        devices_str = "','".join(devices)
+        filters = []
+        params = [start_date, end_date]
 
-        # Query SQL
+        if devices:
+            placeholders = ','.join(['%s'] * len(devices))
+            filters.append(f"device_name IN ({placeholders})")
+            params.extend(devices)
+
+        if filter_by_keys:
+            key_filter = """
+                (
+                    object ? 'analogInput'
+                    OR object ? 'PM_2P5'
+                    OR object ? 'PM2_5'
+                    OR object ? 'PM25'
+                    OR object ? 'pm25'
+                    OR object ? 'PM_10'
+                    OR object ? 'PM10'
+                    OR object ? 'pm10'
+                )
+            """
+            filters.append(key_filter)
+
+        # Excluir dispositivos cuyo nombre contenga 'Prototipo'
+        filters.append("COALESCE(device_name, '') NOT ILIKE '%prototipo%'")
+
+        where_clause = " AND ".join(["received_at BETWEEN %s AND %s"] + filters)
+
         query = f"""
         SELECT
             id,
             received_at,
             device_name,
-            ((object -> 'analogInput' -> '2')::NUMERIC) * 10 AS pm25_raw,
-            ((object -> 'analogInput' -> '1')::NUMERIC) * 10 AS pm10_raw,
-            ((object -> 'analogInput' -> '3')::NUMERIC) AS temperature,
-            ((object -> 'analogInput' -> '4')::NUMERIC) AS rh
+            CASE
+                WHEN object ? 'analogInput' THEN ((object -> 'analogInput' -> '2')::NUMERIC) * 10
+                WHEN object ? 'PM_2P5' THEN NULLIF(object ->> 'PM_2P5', '')::NUMERIC
+                WHEN object ? 'PM2_5' THEN NULLIF(object ->> 'PM2_5', '')::NUMERIC
+                WHEN object ? 'PM25' THEN NULLIF(object ->> 'PM25', '')::NUMERIC
+                WHEN object ? 'pm25' THEN NULLIF(object ->> 'pm25', '')::NUMERIC
+                ELSE NULL
+            END AS pm25_raw,
+            CASE
+                WHEN object ? 'analogInput' THEN ((object -> 'analogInput' -> '1')::NUMERIC) * 10
+                WHEN object ? 'PM_10' THEN NULLIF(object ->> 'PM_10', '')::NUMERIC
+                WHEN object ? 'PM10' THEN NULLIF(object ->> 'PM10', '')::NUMERIC
+                WHEN object ? 'pm10' THEN NULLIF(object ->> 'pm10', '')::NUMERIC
+                ELSE NULL
+            END AS pm10_raw,
+            CASE
+                WHEN object ? 'analogInput' THEN (object -> 'analogInput' -> '3')::NUMERIC
+                WHEN object ? 'temperature' THEN NULLIF(object ->> 'temperature', '')::NUMERIC
+                WHEN object ? 'Temperature' THEN NULLIF(object ->> 'Temperature', '')::NUMERIC
+                WHEN object ? 'temp' THEN NULLIF(object ->> 'temp', '')::NUMERIC
+                ELSE NULL
+            END AS temperature,
+            CASE
+                WHEN object ? 'analogInput' THEN (object -> 'analogInput' -> '4')::NUMERIC
+                WHEN object ? 'rh' THEN NULLIF(object ->> 'rh', '')::NUMERIC
+                WHEN object ? 'RH' THEN NULLIF(object ->> 'RH', '')::NUMERIC
+                WHEN object ? 'humidity' THEN NULLIF(object ->> 'humidity', '')::NUMERIC
+                WHEN object ? 'Humidity' THEN NULLIF(object ->> 'Humidity', '')::NUMERIC
+                ELSE NULL
+            END AS rh
         FROM public.device_up
-        WHERE device_name IN ('{devices_str}')
-          AND received_at BETWEEN '{start_date}' AND '{end_date}'
-          AND object ? 'analogInput'
-        ORDER BY received_at
+        WHERE {where_clause}
+        ORDER BY received_at DESC
         """
+        global LAST_LOW_COST_QUERY
+        # Registrar la consulta completa para depuración (aunque falle la ejecución)
+        try:
+            with conn.cursor() as cur:
+                LAST_LOW_COST_QUERY = cur.mogrify(query, params).decode('utf-8').strip()
+        except Exception as dbg_exc:
+            # Si falla mogrify (p. ej., desajuste de parámetros), conserva query y params crudos
+            LAST_LOW_COST_QUERY = f"-- mogrify_failed: {dbg_exc}\n{query}\n-- params: {params}"
 
         # Cargar datos
-        df = pd.read_sql(query, conn)
+        df = pd.read_sql(query, conn, params=params)
         conn.close()
 
-        # Procesar datos
-        if not df.empty:
-            # Convertir a datetime y eliminar timezone
-            df['received_at'] = pd.to_datetime(df['received_at']).dt.tz_localize(None)
-            df = df.rename(columns={
-                'received_at': 'datetime',
-                'pm25_raw': 'pm25_sensor',  # Renombrar a pm25_sensor para consistencia con calibración
-                'pm10_raw': 'pm10_sensor'   # Renombrar a pm10_sensor para consistencia con calibración
-            })
-
-            # Resample a promedios horarios
-            df_hourly = df.groupby(['device_name', pd.Grouper(key='datetime', freq='H')]).agg({
-                'pm25_sensor': 'mean',
-                'pm10_sensor': 'mean',
-                'temperature': 'mean',
-                'rh': 'mean'
-            }).reset_index()
-
-            return df_hourly
-        else:
+        if df.empty:
             print("No se encontraron datos para el período especificado")
             return pd.DataFrame()
 
+        df['received_at'] = pd.to_datetime(df['received_at']).dt.tz_localize(None)
+        if 'device_name' not in df.columns:
+            df['device_name'] = 'Desconocido'
+        else:
+            df['device_name'] = df['device_name'].fillna('Desconocido')
+        df = df.rename(columns={
+            'received_at': 'datetime',
+            'pm25_raw': 'pm25_sensor',
+            'pm10_raw': 'pm10_sensor'
+        })
+
+        if not aggregate:
+            return df.sort_values('datetime').reset_index(drop=True)
+
+        df_hourly = df.groupby(['device_name', pd.Grouper(key='datetime', freq='H')]).agg({
+            'pm25_sensor': 'mean',
+            'pm10_sensor': 'mean',
+            'temperature': 'mean',
+            'rh': 'mean'
+        }).reset_index()
+
+        return df_hourly
+
     except Exception as e:
+        import traceback
         print(f"Error cargando datos de sensores: {e}")
+        traceback.print_exc()
         return None
 
+
+
+def find_dense_window(lowcost_df, window_days=10, devices=None):
+    """
+    Encuentra la ventana deslizante de 'window_days' días con mayor densidad de datos.
+
+    Args:
+        lowcost_df (DataFrame): Datos horarios de sensores de bajo costo.
+        window_days (int): Duración de la ventana en días (default: 10).
+        devices (list[str], opcional): Lista de dispositivos a priorizar.
+
+    Returns:
+        dict | None: Información de la mejor ventana encontrada.
+    """
+    if lowcost_df is None or lowcost_df.empty:
+        return None
+
+    df = lowcost_df.copy()
+    if 'datetime' not in df.columns:
+        return None
+
+    df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+    df = df.dropna(subset=['datetime'])
+    if df.empty:
+        return None
+
+    if devices:
+        df = df[df['device_name'].isin(devices)]
+        if df.empty:
+            return None
+
+    # Normalizar hora y ordenar
+    df['datetime'] = df['datetime'].dt.floor('H')
+    df = df.sort_values('datetime')
+
+    start_ts = df['datetime'].min().normalize()
+    end_ts = df['datetime'].max()
+
+    if pd.isna(start_ts) or pd.isna(end_ts):
+        return None
+
+    window_duration = pd.Timedelta(days=window_days)
+    if end_ts - start_ts < pd.Timedelta(hours=1):
+        return None
+
+    last_start = (end_ts - window_duration).floor('D')
+    if last_start < start_ts:
+        last_start = start_ts
+
+    start_candidates = pd.date_range(start_ts, last_start, freq='D')
+    if len(start_candidates) == 0:
+        start_candidates = pd.DatetimeIndex([start_ts])
+
+    best_window = None
+    priority_devices = devices or df['device_name'].unique().tolist()
+
+    for candidate_start in start_candidates:
+        candidate_end = candidate_start + window_duration - pd.Timedelta(hours=1)
+        mask = (df['datetime'] >= candidate_start) & (df['datetime'] <= candidate_end)
+        subset = df.loc[mask]
+        total_records = len(subset)
+        if total_records == 0:
+            continue
+
+        per_device_counts = subset['device_name'].value_counts()
+        # Cobertura mínima de dispositivos prioritarios
+        coverage_min = None
+        if priority_devices:
+            coverage_series = per_device_counts.reindex(priority_devices).fillna(0)
+            coverage_min = coverage_series.min()
+
+        # Registrar conteos por contaminante y dispositivo
+        pollutant_counts = {}
+        for device in priority_devices:
+            device_subset = subset[subset['device_name'] == device]
+            if device_subset.empty:
+                pollutant_counts[device] = {'pm25': 0, 'pm10': 0}
+                continue
+
+            pm25_count = int(device_subset['pm25_sensor'].notna().sum()) if 'pm25_sensor' in device_subset.columns else 0
+            pm10_count = int(device_subset['pm10_sensor'].notna().sum()) if 'pm10_sensor' in device_subset.columns else 0
+            pollutant_counts[device] = {
+                'pm25': pm25_count,
+                'pm10': pm10_count
+            }
+
+        candidate = {
+            'start': candidate_start,
+            'end': candidate_end,
+            'subset': subset.copy(),
+            'total_records': int(total_records),
+            'per_device_counts': per_device_counts.astype(int).to_dict(),
+            'pollutant_counts': pollutant_counts,
+            'hours_covered': int(subset['datetime'].nunique()),
+            'coverage_min': float(coverage_min) if coverage_min is not None else None
+        }
+
+        if best_window is None:
+            best_window = candidate
+            continue
+
+        # Priorizar mayor número total de registros
+        if candidate['total_records'] > best_window['total_records']:
+            best_window = candidate
+            continue
+
+        if candidate['total_records'] == best_window['total_records']:
+            # Desempatar por cobertura mínima de dispositivos prioritarios
+            cand_cov = candidate['coverage_min'] or 0
+            best_cov = best_window['coverage_min'] or 0
+            if cand_cov > best_cov:
+                best_window = candidate
+                continue
+            # Como último recurso, elegir la ventana cronológicamente más temprana
+            if cand_cov == best_cov and candidate_start < best_window['start']:
+                best_window = candidate
+
+    return best_window
 
 
 def _load_postman_body_template():
@@ -385,6 +575,75 @@ def merge_datasets(lowcost_df, rmcab_df, tolerance='1H'):
     except Exception as e:
         print(f"Error combinando datasets: {e}")
         return None
+
+
+def align_lowcost_with_reference(lowcost_df, reference_times, tolerance_minutes=30):
+    """
+    Selecciona el registro de cada sensor más cercano a cada timestamp de referencia.
+
+    Args:
+        lowcost_df (DataFrame): Medidas de sensores (sin agregar).
+        reference_times (Iterable[datetime]): Timestamps de referencia (RMCAB).
+        tolerance_minutes (int): Ventana máxima para considerar una coincidencia.
+
+    Returns:
+        DataFrame con columnas alineadas a los timestamps de referencia.
+    """
+    if lowcost_df is None or lowcost_df.empty or not reference_times:
+        return pd.DataFrame()
+
+    reference_sorted = sorted(pd.to_datetime(reference_times))
+    if not reference_sorted:
+        return pd.DataFrame()
+
+    ref_df = pd.DataFrame({'reference_datetime': reference_sorted})
+    tolerance = pd.Timedelta(minutes=tolerance_minutes)
+    aligned_frames = []
+
+    for device, device_df in lowcost_df.groupby('device_name'):
+        device_sorted = device_df.sort_values('datetime')
+        merged = pd.merge_asof(
+            ref_df,
+            device_sorted,
+            left_on='reference_datetime',
+            right_on='datetime',
+            direction='nearest',
+            tolerance=tolerance
+        )
+
+        if merged.empty:
+            continue
+
+        merged = merged.dropna(subset=['device_name'])
+        if merged.empty:
+            continue
+
+        merged = merged.rename(columns={'datetime': 'sensor_datetime'})
+        merged['datetime'] = merged['reference_datetime']
+        merged['device_name'] = merged['device_name'].astype(str)
+        aligned_frames.append(merged)
+
+    if not aligned_frames:
+        return pd.DataFrame()
+
+    result = pd.concat(aligned_frames, ignore_index=True)
+    if 'reference_datetime' in result.columns:
+        result = result.drop(columns=['reference_datetime'])
+
+    preferred_order = [
+        'datetime',
+        'device_name',
+        'pm25_sensor',
+        'pm10_sensor',
+        'temperature',
+        'rh',
+        'sensor_datetime'
+    ]
+    for column in preferred_order:
+        if column not in result.columns:
+            result[column] = pd.NA
+
+    return result[preferred_order]
 
 
 if __name__ == '__main__':

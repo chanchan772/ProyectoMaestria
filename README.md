@@ -16,6 +16,7 @@ Aplicación web completa para la **validación, modelado predictivo y visualizac
 - [Tecnologías Utilizadas](#-tecnologías-utilizadas)
 - [Instalación](#-instalación)
 - [Uso](#-uso)
+- [Consulta SQL de Sensores](#-consulta-sql-de-sensores)
 - [Deployment en Render](#-deployment-en-render)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
 - [API Endpoints](#-api-endpoints)
@@ -213,6 +214,31 @@ La aplicación estará disponible en: http://localhost:5000
 3. Haz clic en **"Ejecutar Calibración"**
 4. Espera a que los 5 modelos se entrenen y evalúen
 5. Revisa los resultados comparativos
+
+---
+
+## ?? Consulta SQL de Sensores
+
+La carga de datos desde PostgreSQL se basa en la siguiente consulta (ver `modules/data_loader.py`):
+
+```sql
+SELECT
+    id,
+    received_at,
+    device_name,
+    ((object -> 'analogInput' -> '2')::NUMERIC) * 10 AS pm25_raw,
+    ((object -> 'analogInput' -> '1')::NUMERIC) * 10 AS pm10_raw,
+    ((object -> 'analogInput' -> '3')::NUMERIC) AS temperature,
+    ((object -> 'analogInput' -> '4')::NUMERIC) AS rh
+FROM public.device_up
+WHERE device_name IN ('Aire2', 'Aire4', 'Aire5')
+  AND received_at BETWEEN '[fecha_inicio]' AND '[fecha_fin]'
+  AND object ? 'analogInput'
+ORDER BY received_at;
+```
+
+Después de ejecutar la consulta, normalizamos `received_at` (sin timezone), renombramos las columnas a `pm25_sensor`, `pm10_sensor`, `temperature` y `rh`, y agregamos por hora para cada dispositivo antes de graficar, calibrar o exportar la información.
+
 
 ---
 
