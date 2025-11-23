@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section fade-in">
+    <div class="container">
+        <div class="row text-center mb-5">
+            <div class="col-md-10 mx-auto">
+                <h2 class="section-title">Stack Tecnológico Completo</h2>
+                <p class="section-subtitle">
+                    Este proyecto integra un stack moderno de tecnologías para ciencia de datos, machine learning y desarrollo web. Cada herramienta fue seleccionada específicamente para optimizar el rendimiento, la escalabilidad y la mantenibilidad de la solución.
+                </p>
+            </div>
+        </div>
+
+        <!-- Sección: Arquitectura General -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Arquitectura del Proyecto</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <h6 class="fw-bold text-primary">🗄️ Base de Datos</h6>
+                                <p class="small">PostgreSQL</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="fw-bold text-primary">🐍 Backend</h6>
+                                <p class="small">Python + Flask</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="fw-bold text-primary">🤖 ML Engine</h6>
+                                <p class="small">Scikit-learn</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="fw-bold text-primary">🎨 Frontend</h6>
+                                <p class="small">HTML5 + CSS3 + JavaScript</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backend Languages & Frameworks -->
+        <div class="row text-center mb-4">
+            <div class="col-lg-12">
+                <h4 class="text-success mb-3">🐍 Backend & Ciencia de Datos</h4>
+            </div>
+        </div>
+        <div class="row g-4 justify-content-center mb-5">
+            <!-- Python -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-success">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c3/Python-logo-notext.svg" alt="Python Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-success">Python</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 3.11+</p>
+                        <p class="card-text small">Lenguaje principal del proyecto. Utilizado para todo el backend, procesamiento de datos y modelos de machine learning.</p>
+                        <h6 class="fw-bold mt-3 small">Rol en el Proyecto:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Backend con Flask</li>
+                            <li>✓ Carga y transformación de datos</li>
+                            <li>✓ Entrenamiento de modelos ML</li>
+                            <li>✓ API REST</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flask -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-success">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Flask_logo.svg" alt="Flask Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-success">Flask</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 2.3+</p>
+                        <p class="card-text small">Micro-framework web ligero y flexible para construir la aplicación web y API REST.</p>
+                        <h6 class="fw-bold mt-3 small">Funcionalidades:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Enrutamiento de URLs</li>
+                            <li>✓ Renderizado de templates</li>
+                            <li>✓ Manejo de solicitudes HTTP</li>
+                            <li>✓ Gestión de errores</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LightGBM -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-success">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <div style="width: 60px; height: 60px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 20px;">
+                                LGB
+                            </div>
+                        </div>
+                        <h5 class="card-title text-success">LightGBM</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 4.0+</p>
+                        <p class="card-text small">Framework avanzado de Gradient Boosting para regresión y clasificación. Principal algoritmo del Modelo Predictivo Híbrido.</p>
+                        <h6 class="fw-bold mt-3 small">Modelos Implementados:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Regresión PM2.5</li>
+                            <li>✓ Regresión PM10</li>
+                            <li>✓ Clasificación PM2.5 (Low/Med/High)</li>
+                            <li>✓ Clasificación PM10 (Low/Med/High)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scikit-learn -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-success">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/0/05/Scikit_learn_logo_small.svg" alt="Scikit-learn Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-success">Scikit-learn</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 1.3+</p>
+                        <p class="card-text small">Librería fundamental de machine learning. Utilizada para normalización de datos, métricas de evaluación y utilities.</p>
+                        <h6 class="fw-bold mt-3 small">Utilidades Clave:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ MinMaxScaler (normalización)</li>
+                            <li>✓ LabelEncoder (categorías)</li>
+                            <li>✓ r2_score, RMSE, MAE, MAPE</li>
+                            <li>✓ Métricas de evaluación</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Matplotlib -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-success">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/8/84/Matplotlib_icon.svg" alt="Matplotlib Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-success">Matplotlib</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 3.7+</p>
+                        <p class="card-text small">Librería de visualización estática para generar gráficos de evaluación de modelos (scatter, histogramas, etc.).</p>
+                        <h6 class="fw-bold mt-3 small">Gráficos Generados:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Scatter plots (Real vs Predicho)</li>
+                            <li>✓ Histogramas de residuos</li>
+                            <li>✓ 4-panel evaluations</li>
+                            <li>✓ Métricas textuales</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pandas -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-success">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/e/ed/Pandas_logo.svg" alt="Pandas Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-success">Pandas</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 2.0+</p>
+                        <p class="card-text small">Librería para manipulación y análisis de datos. Fundamental para procesar DataFrames con datos de sensores.</p>
+                        <h6 class="fw-bold mt-3 small">Funcionalidades Clave:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Lectura de CSV y bases de datos</li>
+                            <li>✓ Limpieza y transformación</li>
+                            <li>✓ Resampling y agregación</li>
+                            <li>✓ Merge y join de datasets</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NumPy -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-success">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/3/31/NumPy_logo_2020.svg" alt="NumPy Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-success">NumPy</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 1.24+</p>
+                        <p class="card-text small">Librería fundamental para computación numérica y operaciones matriciales. Base de Pandas y Scikit-learn.</p>
+                        <h6 class="fw-bold mt-3 small">Uso en el Proyecto:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Operaciones numéricas</li>
+                            <li>✓ Arrays multidimensionales</li>
+                            <li>✓ Cálculos estadísticos</li>
+                            <li>✓ Normalización de datos</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PostgreSQL -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-success">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/2/29/Postgresql_elephant.svg" alt="PostgreSQL Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-success">PostgreSQL</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 12+</p>
+                        <p class="card-text small">Base de datos relacional robusta para almacenamiento persistente de datos de sensores y modelos calibrados.</p>
+                        <h6 class="fw-bold mt-3 small">Contenido:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Tabla device_up (datos sensores)</li>
+                            <li>✓ Tabla device_up_calibrated</li>
+                            <li>✓ Índices optimizados</li>
+                            <li>✓ Integridad referencial</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Frontend Technologies -->
+        <div class="row text-center mb-4">
+            <div class="col-lg-12">
+                <h4 class="text-primary mb-3">🎨 Frontend & Visualización</h4>
+            </div>
+        </div>
+        <div class="row g-4 justify-content-center mb-5">
+            <!-- HTML5 -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-primary">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/6/61/HTML5_logo_and_wordmark.svg" alt="HTML5 Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-primary">HTML5</h5>
+                        <p class="small text-muted mb-2"><strong>Estándar:</strong> Última especificación</p>
+                        <p class="card-text small">Lenguaje de marcado semántico para estructurar el contenido de todas las páginas de la aplicación.</p>
+                        <h6 class="fw-bold mt-3 small">Características:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Semántica moderna</li>
+                            <li>✓ Formularios interactivos</li>
+                            <li>✓ Metadatos completos</li>
+                            <li>✓ Accesibilidad (a11y)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CSS3 -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-primary">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/d/d5/CSS3_logo_and_wordmark.svg" alt="CSS3 Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-primary">CSS3</h5>
+                        <p class="small text-muted mb-2"><strong>Módulos:</strong> Grid, Flexbox, Media Queries</p>
+                        <p class="card-text small">Hojas de estilo para crear un diseño atractivo, responsive y coherente en todas las páginas.</p>
+                        <h6 class="fw-bold mt-3 small">Características Clave:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Diseño responsive</li>
+                            <li>✓ Animaciones suaves</li>
+                            <li>✓ Paleta de colores ambiental</li>
+                            <li>✓ Efecto fade-in en secciones</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JavaScript -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-primary">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/9/99/Unofficial_JavaScript_logo_2.svg" alt="JavaScript Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-primary">JavaScript</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> ES6+ (Vanilla JS)</p>
+                        <p class="card-text small">Lenguaje de programación del lado del cliente para interactividad dinámica y manejo de eventos.</p>
+                        <h6 class="fw-bold mt-3 small">Funcionalidades:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Manipulación del DOM</li>
+                            <li>✓ Event listeners</li>
+                            <li>✓ Validación de formularios</li>
+                            <li>✓ Comunicación AJAX</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bootstrap -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-primary">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/b/b2/Bootstrap_logo.svg" alt="Bootstrap Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-primary">Bootstrap</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 5.3.3</p>
+                        <p class="card-text small">Framework CSS moderno para desarrollo frontend rápido con componentes pre-construidos y sistema de grid responsive.</p>
+                        <h6 class="fw-bold mt-3 small">Componentes Utilizados:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Grid system (12 columnas)</li>
+                            <li>✓ Navbar responsive</li>
+                            <li>✓ Cards y layouts</li>
+                            <li>✓ Utilidades de espaciado</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FontAwesome -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-primary">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/d/d5/Font_Awesome_5_logo.svg" alt="FontAwesome Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-primary">Font Awesome</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 6.0+</p>
+                        <p class="card-text small">Librería de iconos SVG para mejorar la experiencia visual de la interfaz con símbolos significativos y reconocibles.</p>
+                        <h6 class="fw-bold mt-3 small">Usos en el Proyecto:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Iconos de navegación</li>
+                            <li>✓ Indicadores de estado</li>
+                            <li>✓ Botones y controles</li>
+                            <li>✓ Visualización de métricas</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deployment & DevOps -->
+        <div class="row text-center mb-4">
+            <div class="col-lg-12">
+                <h4 class="text-warning mb-3">⚙️ Deployment & Producción</h4>
+            </div>
+        </div>
+        <div class="row g-4 justify-content-center mb-5">
+            <!-- Gunicorn -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-warning">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/1/18/Gunicorn_logo_2010.svg" alt="Gunicorn Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-warning">Gunicorn</h5>
+                        <p class="small text-muted mb-2"><strong>Versión:</strong> 21.0+</p>
+                        <p class="card-text small">Servidor WSGI (Web Server Gateway Interface) para ejecutar aplicaciones Flask en producción de forma estable y escalable.</p>
+                        <h6 class="fw-bold mt-3 small">Configuración:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Workers múltiples</li>
+                            <li>✓ Manejo de concurrencia</li>
+                            <li>✓ Reinicio automático</li>
+                            <li>✓ Logging completo</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Git -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-warning">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="#F1502F">
+                                <path d="M11.4 7.3c-3.8 0-6.9 3.1-6.9 6.9s3.1 6.9 6.9 6.9 6.9-3.1 6.9-6.9-3.1-6.9-6.9-6.9zm0 12.6c-3.1 0-5.7-2.6-5.7-5.7s2.6-5.7 5.7-5.7 5.7 2.6 5.7 5.7-2.6 5.7-5.7 5.7zm3.5-9.1l-4 2.3-4-2.3" />
+                            </svg>
+                        </div>
+                        <h5 class="card-title text-warning">Git & GitHub</h5>
+                        <p class="small text-muted mb-2"><strong>Sistema:</strong> Control de versiones</p>
+                        <p class="card-text small">Sistema de control de versiones distribuido para gestionar el código fuente y colaboración en el proyecto.</p>
+                        <h6 class="fw-bold mt-3 small">Uso:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Versionado de código</li>
+                            <li>✓ Historial de cambios</li>
+                            <li>✓ Ramas de desarrollo</li>
+                            <li>✓ Integración continua</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Render.com -->
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-warning">
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <img src="https://renders-api.notion.so/public/1.0/files/7f85a67f-4577-47e2-8fc8-5b3f0e8a12d8?signature=7J5dZWc_eB2GQ6_xQH_7rGZBUuwY0PHbf_SPwT0q_EU" alt="Render Logo" style="width: 60px; height: 60px;">
+                        </div>
+                        <h5 class="card-title text-warning">Render</h5>
+                        <p class="small text-muted mb-2"><strong>Plataforma:</strong> Cloud Hosting</p>
+                        <p class="card-text small">Plataforma moderna de hosting en la nube para desplegar aplicaciones Flask con ciencia de datos de forma sencilla.</p>
+                        <h6 class="fw-bold mt-3 small">Ventajas:</h6>
+                        <ul class="small list-unstyled">
+                            <li>✓ Despliegue automático</li>
+                            <li>✓ Escalabilidad</li>
+                            <li>✓ HTTPS automático</li>
+                            <li>✓ Variables de entorno seguras</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumen Técnico -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Estadísticas del Stack Tecnológico</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <h6 class="fw-bold">Lenguajes</h6>
+                                <p class="large text-info">3</p>
+                                <small class="text-muted">Python, JavaScript, HTML/CSS</small>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="fw-bold">Librerías Python</h6>
+                                <p class="large text-info">10+</p>
+                                <small class="text-muted">LightGBM, Flask, Pandas, etc.</small>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="fw-bold">Frameworks ML</h6>
+                                <p class="large text-info">1</p>
+                                <small class="text-muted">LightGBM Gradient Boosting</small>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="fw-bold">Modelos Entrenados</h6>
+                                <p class="large text-info">4</p>
+                                <small class="text-muted">2 Regresión + 2 Clasificación</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

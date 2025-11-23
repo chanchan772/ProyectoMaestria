@@ -1,40 +1,41 @@
 @echo off
-echo ============================================
-echo   Monitoreo de Calidad del Aire
-echo   Universidad Central - Maestria en Analitica de Datos
-echo ============================================
-echo.
+echo "Configurando el entorno y ejecutando la aplicacion de Fase 4..."
 
-REM Verificar si Python esta instalado
-python --version >nul 2>&1
+REM Guarda el directorio actual
+set CURRENT_DIR=%~dp0
+
+REM Nombre del entorno virtual
+set VENV_NAME=.venv
+
+REM Comprueba si existe el entorno virtual
+if not exist "%CURRENT_DIR%%VENV_NAME%" (
+    echo "Creando entorno virtual..."
+    python -m venv "%CURRENT_DIR%%VENV_NAME%"
+    if %errorlevel% neq 0 (
+        echo "Error: No se pudo crear el entorno virtual. Asegurate de tener Python instalado y en el PATH."
+        goto :eof
+    )
+)
+
+REM Activa el entorno virtual
+echo "Activando entorno virtual..."
+call "%CURRENT_DIR%%VENV_NAME%\Scripts\activate.bat"
+
+REM Instala las dependencias
+echo "Instalando dependencias desde requirements.txt..."
+pip install -r "%CURRENT_DIR%requirements.txt"
 if %errorlevel% neq 0 (
-    echo ERROR: Python no esta instalado o no esta en el PATH
-    echo Por favor instala Python 3.11 o superior
-    pause
-    exit /b 1
+    echo "Error: No se pudieron instalar las dependencias."
+    goto :eof
 )
 
-echo Verificando instalacion de Python: OK
-echo.
 
-REM Activar entorno virtual si existe
-if exist "venv\Scripts\activate.bat" (
-    echo Activando entorno virtual...
-    call venv\Scripts\activate.bat
-) else (
-    echo ADVERTENCIA: No se encontro entorno virtual
-    echo Ejecutando con Python global...
-)
+REM Establece la variable de entorno para Flask y ejecuta la app
+echo "Iniciando la aplicacion Flask..."
+set FLASK_APP=%CURRENT_DIR%app.py
+set FLASK_ENV=development
+flask run
 
-echo.
-echo Iniciando aplicacion Flask...
-echo La aplicacion se abrira en: http://localhost:5000
-echo.
-echo Presiona Ctrl+C para detener el servidor
-echo ============================================
-echo.
-
-REM Ejecutar aplicacion Flask
-python app.py
-
+echo "La aplicacion se ha detenido."
 pause
+:eof

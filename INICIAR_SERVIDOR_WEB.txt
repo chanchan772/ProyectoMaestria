@@ -1,0 +1,252 @@
+================================================================================
+  🚀 INICIAR SERVIDOR WEB - OBJETIVO 2
+================================================================================
+
+OBJETIVO: Probar el modelo predictivo LSTM interactivamente en navegador web
+
+================================================================================
+PASO 1: ABRIR TERMINAL
+================================================================================
+
+Windows PowerShell o CMD:
+
+  Navega a:
+  cd "C:\Users\Sebastian\Documents\Maestria\Proyecto Maestria 23 Sep\fase 4"
+
+  O usa: cd fase\ 4  (si estás en Proyecto Maestria 23 Sep)
+
+================================================================================
+PASO 2: INSTALAR DEPENDENCIAS (primera vez)
+================================================================================
+
+  pip install -r requirements.txt
+
+  Espera a que termine (~2-3 minutos)
+
+================================================================================
+PASO 3: INICIAR SERVIDOR
+================================================================================
+
+  python app.py
+
+  Verás:
+  * Serving Flask app 'app'
+  * Debug mode: on
+  * Running on http://127.0.0.1:5000
+  * Press CTRL+C to quit
+
+  ✅ Servidor está activo
+
+================================================================================
+PASO 4: ABRIR EN NAVEGADOR
+================================================================================
+
+  Opción A: Haz clic en el enlace en la terminal
+  Opción B: Escribe en navegador:
+
+    http://127.0.0.1:5000/objetivo-2
+
+  Verás página interactiva con:
+  ├─ Botón "🧠 Entrenar Modelo"
+  ├─ Instrucciones claras
+  └─ Área para resultados
+
+================================================================================
+PASO 5: ENTRENAR MODELO
+================================================================================
+
+  1. Haz clic en botón verde: "🧠 Entrenar Modelo"
+
+  2. Verás indicador de progreso animado:
+     ├─ "Cargando datos..."
+     ├─ "Entrenando LSTM..."
+     ├─ "Generando gráficos..."
+     └─ "Completado ✓"
+
+  3. Espera 5-10 minutos (depende de tu PC)
+
+  4. Automáticamente aparecerán:
+     ├─ 📊 Tabla de métricas PM2.5 y PM10
+     ├─ 📖 Interpretación de resultados
+     ├─ 📈 Gráficos de predicciones
+     ├─ 📊 Gráfico de comparación 1h-3h-5h
+     └─ 📥 Botones de descarga
+
+================================================================================
+PASO 6: ANALIZAR RESULTADOS
+================================================================================
+
+  En la página verá:
+
+  MÉTRICAS (tablas):
+  ├─ RMSE (error cuadrático medio)
+  ├─ MAE (error absoluto promedio)
+  ├─ R² (varianza explicada 0-1)
+  └─ MAPE (error porcentual %)
+
+  GRÁFICOS (imágenes):
+  ├─ PM2.5: 3 scatter plots (1h, 3h, 5h)
+  ├─ PM10: 3 scatter plots (1h, 3h, 5h)
+  └─ Comparación: 4 line plots
+
+  DESCARGAS:
+  ├─ predictive_metrics.csv (abrir en Excel)
+  ├─ predictions_PM25.png (guardar imagen)
+  ├─ predictions_PM10.png (guardar imagen)
+  └─ steps_comparison.png (guardar imagen)
+
+================================================================================
+PASO 7: DESCARGAR RESULTADOS
+================================================================================
+
+  Haz clic en cualquiera de los botones:
+  ├─ "📥 Métricas (CSV)"
+  ├─ "📥 PM2.5 (PNG)"
+  ├─ "📥 PM10 (PNG)"
+  └─ "📥 Comparación (PNG)"
+
+  Los archivos se guardarán en tu carpeta de Descargas
+
+  O accede directamente:
+  └─ static/results/  (en la carpeta del proyecto)
+
+================================================================================
+PASO 8: REINICIAR O ENTRENAR DE NUEVO
+================================================================================
+
+  Opción A: Entrenar con diferentes datos
+  ├─ Haz clic en "🔄 Reiniciar"
+  ├─ Modifica parametros en train_predictor.py (si quieres)
+  └─ Haz clic en "🧠 Entrenar Modelo" de nuevo
+
+  Opción B: Ver resultados sin entrenar
+  ├─ Los gráficos quedan guardados en static/results/
+  ├─ Actualiza página (F5) para verlos de nuevo
+  └─ Los resultados persisten hasta nuevo entrenamiento
+
+================================================================================
+PASO 9: DETENER SERVIDOR
+================================================================================
+
+  En la terminal, presiona:
+
+  CTRL + C
+
+  Verá:
+  KeyboardInterrupt
+  * Shutting down Flask development server
+  Shutting down
+
+  ✅ Servidor detenido
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+ERROR: "Connection refused"
+  ├─ Verificar: ¿Ejecutó python app.py?
+  ├─ Esperar: 2 segundos después de ejecutar
+  └─ Reintentar: Actualizar página (F5)
+
+ERROR: "404 Not Found"
+  ├─ Verificar URL: http://127.0.0.1:5000/objetivo-2
+  ├─ No es: http://localhost:5000/objetivo2 (sin 2)
+  └─ Usar: Copy-paste del enlace correcto
+
+ERROR: "PostgreSQL: connection refused"
+  ├─ Problema: BD no disponible
+  ├─ Solución: Verificar host en .env
+  ├─ Verificar: 186.121.143.150:15432
+  └─ Contactar: Admin de BD
+
+ERROR: "CSV file not found: data_rmcab/rmcab_data.csv"
+  ├─ Problema: Falta archivo RMCAB
+  ├─ Carpeta: data_rmcab/ debe existir
+  └─ Archivo: rmcab_data.csv debe estar adentro
+
+ERROR: "TensorFlow not found"
+  ├─ Solución: pip install tensorflow==2.10.0
+  ├─ Esperar: ~5 minutos (descarga grande)
+  └─ Reintentar: python app.py
+
+ERROR: "Page too slow"
+  ├─ Normal durante entrenamiento (LSTM es lento)
+  ├─ Esperar: ~10 minutos máximo
+  ├─ GPU: Si tienes, instala tensorflow-gpu (más rápido)
+  └─ Reducir: Datos (cambiar fechas en train_predictor.py)
+
+================================================================================
+TIPS
+================================================================================
+
+MEJOR EXPERIENCIA:
+  ├─ Pantalla grande (Desktop es mejor que móvil)
+  ├─ Conexión estable (WiFi recomendado)
+  └─ Navegador moderno (Chrome, Firefox, Edge)
+
+PARA PRESENTACIONES:
+  ├─ Ejecuta una vez antes
+  ├─ Verifica que funcione
+  ├─ En presentación: Haz clic en "Entrenar" como demo en vivo
+  └─ Alternativa: Usa resultados previos (ya estarán guardados)
+
+PARA GUARDAR RESULTADOS:
+  ├─ Opción 1: Descargar desde web
+  ├─ Opción 2: Copiar archivos de static/results/
+  └─ Opción 3: Exportar CSV a Excel y editar
+
+PARA REPRODUCIBILIDAD:
+  ├─ Mismos datos → Mismos resultados (LSTM es determinista)
+  ├─ Cambiar seed: Modificar train_predictor.py
+  └─ Documentar: Guardar CSV con fecha/hora
+
+================================================================================
+FLUJO COMPLETO (RÁPIDO)
+================================================================================
+
+Terminal 1:
+$ cd fase\ 4
+$ pip install -r requirements.txt  (solo primera vez)
+$ python app.py
+→ Verás: "Running on http://127.0.0.1:5000"
+
+Navegador:
+→ http://127.0.0.1:5000/objetivo-2
+→ Haz clic en "🧠 Entrenar Modelo"
+→ Espera 5-10 minutos
+→ Revisa tablas, gráficos, métricas
+→ Descarga resultados
+
+Terminal 1:
+→ CTRL+C para detener
+
+✅ LISTO
+
+================================================================================
+DOCUMENTACIÓN
+================================================================================
+
+Para más detalles, consulta:
+├─ PROBAR_OBJETIVO2_WEB.md      (Esta interfaz web)
+├─ README_OBJETIVO2.md          (Inicio rápido)
+├─ RESUMEN_EJECUTIVO_OBJETIVO2.md (Qué se entregó)
+├─ OBJETIVO_2_MODELO_PREDICTIVO.md (Detalles técnicos)
+└─ COMO_SE_PENSO_EL_MODELO.md   (Justificación del diseño)
+
+================================================================================
+ERES LISTO PARA INICIAR
+================================================================================
+
+Ejecuta:
+
+  python app.py
+
+Y abre:
+
+  http://127.0.0.1:5000/objetivo-2
+
+¡Disfruta!
+
+================================================================================
+Versión 1.0 - 2025-11-20
+================================================================================

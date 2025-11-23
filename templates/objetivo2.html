@@ -1,0 +1,958 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section fade-in">
+    <div class="container">
+        <!-- TITULO PRINCIPAL -->
+        <div class="row text-center mb-5">
+            <div class="col-md-10 mx-auto">
+                <h2 class="section-title">Objetivo 2: Modelo Predictivo de Calidad del Aire</h2>
+                <p class="section-subtitle">
+                    Predicción de PM2.5 y PM10 para la próxima hora usando aprendizaje automático avanzado
+                </p>
+            </div>
+        </div>
+
+        <!-- SECCION 1: EXPLICACION DEL FLUJO DE DATOS -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">📚 ¿Cómo funciona este modelo?</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-justify mb-3">
+                            Este modelo aprende patrones de contaminación del aire usando datos REALES de RMCAB (Red de Monitoreo de Calidad del Aire de Bogotá).
+                            Divide los datos en dos partes: una para <strong>aprender</strong> (entrenamiento) y otra para <strong>evaluar</strong> (prueba).
+                        </p>
+
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <div class="card border-success mb-3">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><strong>📊 PASO 1: Datos de Entrenamiento</strong> (El modelo APRENDE)</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="small" style="line-height: 1.8;">
+                                            <li><strong>Fuente:</strong> Estación RMCAB - Datos REALES</li>
+                                            <li><strong>Período:</strong> 1 de Enero - ~27 de Octubre 2025</li>
+                                            <li><strong>Cantidad:</strong> <span class="badge bg-success">6,570 horas</span> (~274 días)</li>
+                                            <li><strong>Qué aprende:</strong>
+                                                <ul class="mt-2">
+                                                    <li>Cómo cambia PM2.5 en diferentes horas del día</li>
+                                                    <li>Cómo cambia PM2.5 en diferentes meses/estaciones</li>
+                                                    <li>Correlaciones con temperatura, humedad y viento</li>
+                                                    <li>Patrones de aumento/disminución de contaminación</li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="card border-danger mb-3">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><strong>✓ PASO 2: Datos de Prueba</strong> (Evaluamos qué aprendió)</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="small" style="line-height: 1.8;">
+                                            <li><strong>Fuente:</strong> Estación RMCAB - Datos REALES (diferentes de entrenamiento)</li>
+                                            <li><strong>Período:</strong> ~27 de Octubre - 31 de Diciembre 2025</li>
+                                            <li><strong>Cantidad:</strong> <span class="badge bg-danger">2,190 horas</span> (~91 días)</li>
+                                            <li><strong>Qué evaluamos:</strong>
+                                                <ul class="mt-2">
+                                                    <li>¿Qué tan bien predice valores reales?</li>
+                                                    <li>¿Qué tan cerca están las predicciones?</li>
+                                                    <li>¿En qué casos se equivoca más?</li>
+                                                    <li>¿Cómo clasifica "Bajo/Medio/Alto"?</li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <strong>⚠️ Importante:</strong> El modelo se entrena en datos de enero a octubre, y se evalúa en datos de octubre a diciembre que el modelo <strong>NUNCA</strong> ha visto antes. Esto asegura que realmente funcione bien con datos nuevos.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 2: PANEL DE CONTROL Y ENTRENAMIENTO -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">⚙️ Panel de Control: Entrenar el Modelo</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-center mb-4">
+                            <div class="col-md-8">
+                                <h6 class="text-muted mb-3">Estado actual del modelo:</h6>
+                                <p id="status" class="mb-0">
+                                    <span class="badge bg-secondary">No entrenado</span>
+                                </p>
+                                <div id="progress-container" class="d-none mt-3">
+                                    <div class="progress" style="height: 25px;">
+                                        <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                                             role="progressbar" style="width: 0%">0%</div>
+                                    </div>
+                                    <p id="progress-text" class="text-muted small mt-2">Inicializando...</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button id="train-btn" class="btn btn-lg btn-success" onclick="trainPredictor()">
+                                    <i class="fas fa-brain"></i> Entrenar Modelo
+                                </button>
+                                <button id="reset-btn" class="btn btn-lg btn-secondary ms-2 d-none" onclick="resetModel()">
+                                    <i class="fas fa-redo"></i> Reiniciar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info mb-0">
+                            <h6><i class="fas fa-info-circle"></i> Información importante antes de entrenar:</h6>
+                            <ul class="small mb-0 mt-2">
+                                <li><strong>PRIMERA VEZ:</strong> El entrenamiento tarda ~5-15 minutos. No cierres esta página.</li>
+                                <li><strong>¿Qué hace el modelo?</strong> Lee 8,760 horas de datos REALES de RMCAB (todo 2025), aprende patrones, y genera 4 modelos (PM2.5 Regresión, PM2.5 Clasificación, PM10 Regresión, PM10 Clasificación).</li>
+                                <li><strong>PROXIMAS VECES:</strong> Carga el modelo guardado en ~2 segundos (sin reentrenar).</li>
+                                <li><strong>Los modelos se guardan en:</strong> <code>/models/lightgbm_*.pkl</code></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 3: METRICAS DE EFECTIVIDAD -->
+        <div class="row mb-5" id="metrics-section" style="display: none;">
+            <div class="col-lg-12">
+                <h4 class="text-primary mb-4">📊 Resultados: ¿Qué tan bien predice el modelo?</h4>
+            </div>
+
+            <!-- PM2.5 -->
+            <div class="col-lg-6">
+                <div class="card border-primary h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">PM2.5 (Partículas Finas)</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- REGRESION -->
+                        <h6 class="mb-3" style="border-bottom: 2px solid #0d6efd; padding-bottom: 8px;">
+                            <strong>🎯 REGRESIÓN</strong> - Predicción de valores exactos (en ug/m³)
+                        </h6>
+                        <div class="row mb-3">
+                            <div class="col-6 text-center">
+                                <small class="text-muted d-block mb-1">R² Score (0-1)</small>
+                                <h4 id="pm25-r2" class="text-success">--</h4>
+                                <small class="text-muted">Mayor = Mejor</small>
+                            </div>
+                            <div class="col-6 text-center">
+                                <small class="text-muted d-block mb-1">RMSE (ug/m³)</small>
+                                <h4 id="pm25-rmse" style="color: #ff9800;">--</h4>
+                                <small class="text-muted">Menor = Mejor</small>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6 text-center">
+                                <small class="text-muted d-block mb-1">MAE (ug/m³)</small>
+                                <h4 id="pm25-mae" style="color: #2196f3;">--</h4>
+                                <small class="text-muted">Menor = Mejor</small>
+                            </div>
+                            <div class="col-6 text-center">
+                                <small class="text-muted d-block mb-1">MAPE (%)</small>
+                                <h4 id="pm25-mape" style="color: #9c27b0;">--</h4>
+                                <small class="text-muted">Menor = Mejor</small>
+                            </div>
+                        </div>
+
+                        <!-- CLASIFICACION -->
+                        <h6 class="mb-3" style="border-bottom: 2px solid #0d6efd; padding-top: 10px; padding-bottom: 8px;">
+                            <strong>📍 CLASIFICACIÓN</strong> - Categoría: Bajo/Medio/Alto
+                        </h6>
+                        <div class="text-center p-3" style="background-color: #e3f2fd; border-radius: 8px;">
+                            <small class="text-muted d-block mb-1">Accuracy (0-100%)</small>
+                            <h4 id="pm25-acc" class="text-info">--</h4>
+                            <small class="text-muted">¿Qué porcentaje de categorías predice correctamente?</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PM10 -->
+            <div class="col-lg-6">
+                <div class="card border-success h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">PM10 (Partículas Gruesas)</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- REGRESION -->
+                        <h6 class="mb-3" style="border-bottom: 2px solid #28a745; padding-bottom: 8px;">
+                            <strong>🎯 REGRESIÓN</strong> - Predicción de valores exactos (en ug/m³)
+                        </h6>
+                        <div class="row mb-3">
+                            <div class="col-6 text-center">
+                                <small class="text-muted d-block mb-1">R² Score (0-1)</small>
+                                <h4 id="pm10-r2" class="text-success">--</h4>
+                                <small class="text-muted">Mayor = Mejor</small>
+                            </div>
+                            <div class="col-6 text-center">
+                                <small class="text-muted d-block mb-1">RMSE (ug/m³)</small>
+                                <h4 id="pm10-rmse" style="color: #ff9800;">--</h4>
+                                <small class="text-muted">Menor = Mejor</small>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6 text-center">
+                                <small class="text-muted d-block mb-1">MAE (ug/m³)</small>
+                                <h4 id="pm10-mae" style="color: #2196f3;">--</h4>
+                                <small class="text-muted">Menor = Mejor</small>
+                            </div>
+                            <div class="col-6 text-center">
+                                <small class="text-muted d-block mb-1">MAPE (%)</small>
+                                <h4 id="pm10-mape" style="color: #9c27b0;">--</h4>
+                                <small class="text-muted">Menor = Mejor</small>
+                            </div>
+                        </div>
+
+                        <!-- CLASIFICACION -->
+                        <h6 class="mb-3" style="border-bottom: 2px solid #28a745; padding-top: 10px; padding-bottom: 8px;">
+                            <strong>📍 CLASIFICACIÓN</strong> - Categoría: Bajo/Medio/Alto
+                        </h6>
+                        <div class="text-center p-3" style="background-color: #f1f8e9; border-radius: 8px;">
+                            <small class="text-muted d-block mb-1">Accuracy (0-100%)</small>
+                            <h4 id="pm10-acc" class="text-info">--</h4>
+                            <small class="text-muted">¿Qué porcentaje de categorías predice correctamente?</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 4: EXPLICACION DE METRICAS -->
+        <div class="row mb-5" id="interpretation-section" style="display: none;">
+            <div class="col-lg-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">📖 ¿Qué significan estas métricas?</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold small mb-3">📊 Métricas de REGRESIÓN (Valores exactos):</h6>
+                                <div class="mb-3">
+                                    <h6 class="small text-primary"><strong>R² Score</strong> (0 a 1)</h6>
+                                    <p class="small">Mide qué porcentaje de la variación en los datos reales explica el modelo.
+                                        <br><strong>Ejemplo:</strong> R²=0.8 significa "el modelo explica el 80% de los cambios"
+                                        <br>✅ R²>0.7 = Excelente | ⚠️ R²<0.5 = Malo
+                                    </p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="small text-warning"><strong>RMSE</strong> (Root Mean Square Error - en ug/m³)</h6>
+                                    <p class="small">Error cuadrático promedio. Penaliza errores grandes.
+                                        <br><strong>Ejemplo:</strong> RMSE=5 significa "en promedio, el modelo se equivoca por 5 ug/m³"
+                                        <br>✅ RMSE<5 = Excelente | ⚠️ RMSE>10 = Malo
+                                    </p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="small text-info"><strong>MAE</strong> (Mean Absolute Error - en ug/m³)</h6>
+                                    <p class="small">Error absoluto promedio. Similar a RMSE pero sin penalizar tanto.
+                                        <br><strong>Ejemplo:</strong> MAE=3 significa "en promedio, el modelo se equivoca por 3 ug/m³"
+                                        <br>✅ MAE<3 = Excelente | ⚠️ MAE>5 = Malo
+                                    </p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="small text-danger"><strong>MAPE</strong> (Mean Absolute Percentage Error - %)</h6>
+                                    <p class="small">Error porcentual promedio. Fácil de entender.
+                                        <br><strong>Ejemplo:</strong> MAPE=20% significa "en promedio, el modelo se equivoca en un 20%"
+                                        <br>✅ MAPE<15% = Excelente | ⚠️ MAPE>30% = Malo
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <h6 class="fw-bold small mb-3">🎯 Métrica de CLASIFICACIÓN (Categorías):</h6>
+                                <div class="mb-3">
+                                    <h6 class="small text-success"><strong>Accuracy</strong> (0% a 100%)</h6>
+                                    <p class="small">¿Qué porcentaje de las categorías predice correctamente?
+                                        <br><strong>Ejemplo:</strong> Accuracy=75% significa "en 75 de cada 100 casos, clasifica bien en Bajo/Medio/Alto"
+                                        <br>✅ Accuracy>70% = Bueno | ⚠️ Accuracy<50% = Malo
+                                    </p>
+                                </div>
+
+                                <h6 class="fw-bold small mb-3 mt-4">📌 Escalas de referencia:</h6>
+                                <table class="table table-sm table-bordered">
+                                    <tr>
+                                        <th>Métrica</th>
+                                        <th>Excelente</th>
+                                        <th>Bueno</th>
+                                        <th>Regular</th>
+                                        <th>Malo</th>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>R²</strong></td>
+                                        <td>>0.9</td>
+                                        <td>0.7-0.9</td>
+                                        <td>0.5-0.7</td>
+                                        <td><0.5</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>RMSE</strong></td>
+                                        <td><3</td>
+                                        <td>3-7</td>
+                                        <td>7-12</td>
+                                        <td>>12</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>MAE</strong></td>
+                                        <td><2</td>
+                                        <td>2-5</td>
+                                        <td>5-8</td>
+                                        <td>>8</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Accuracy</strong></td>
+                                        <td>>85%</td>
+                                        <td>70-85%</td>
+                                        <td>50-70%</td>
+                                        <td><50%</td>
+                                    </tr>
+                                </table>
+
+                                <div class="alert alert-info small mt-3 mb-0">
+                                    <strong>💡 Consejo:</strong> Dados los datos limitados y la complejidad de la contaminación del aire,
+                                    resultados con R²>0.5 son razonables. Resultados <0.3 indican que se necesitan más datos o mejor ingeniería de features.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 5: VALIDACION - TABLA DE COMPARACION -->
+        <div class="row mb-5" id="validation-section" style="display: none;">
+            <div class="col-lg-12">
+                <h4 class="text-success mb-3">✓ Validación: Comparar Predicciones vs Valores Reales</h4>
+                <p class="small text-muted mb-3">
+                    Aquí puedes ver <strong>ejemplos concretos</strong> de cómo el modelo predice versus los valores reales del set de PRUEBA.
+                    Los datos mostrados son de octubre a diciembre de 2025 (datos que el modelo nunca vio durante el entrenamiento).
+                </p>
+                <ul class="nav nav-tabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#val-opcion-a">Opción A: 100 Muestras Aleatorias</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#val-opcion-b">Opción B: Primeras 50 Muestras</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#val-opcion-c">Opción C: Resumen Estadístico</a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- OPCION A: 100 MUESTRAS ALEATORIAS -->
+            <div class="col-lg-12 mt-3">
+                <div class="tab-content">
+                    <div id="val-opcion-a" class="tab-pane fade show active">
+                        <p class="small text-muted mb-3">Comparación en 100 momentos aleatorios del set de PRUEBA</p>
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <h6 class="text-primary small mb-2">PM2.5 - Comparación de 100 Muestras Aleatorias</h6>
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Valor Real (ug/m³)</th>
+                                                <th>Predicción (ug/m³)</th>
+                                                <th>Error (ug/m³)</th>
+                                                <th>Error %</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="val-pm25-opcion-a"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <h6 class="text-success small mb-2">PM10 - Comparación de 100 Muestras Aleatorias</h6>
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Valor Real (ug/m³)</th>
+                                                <th>Predicción (ug/m³)</th>
+                                                <th>Error (ug/m³)</th>
+                                                <th>Error %</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="val-pm10-opcion-a"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OPCION B: PRIMERAS 50 MUESTRAS -->
+                    <div id="val-opcion-b" class="tab-pane fade">
+                        <p class="small text-muted mb-3">Las primeras 50 predicciones del set de PRUEBA (orden cronológico)</p>
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <h6 class="text-primary small mb-2">PM2.5 - Primeras 50 Muestras</h6>
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Valor Real (ug/m³)</th>
+                                                <th>Predicción (ug/m³)</th>
+                                                <th>Error (ug/m³)</th>
+                                                <th>Error %</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="val-pm25-opcion-b"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <h6 class="text-success small mb-2">PM10 - Primeras 50 Muestras</h6>
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Valor Real (ug/m³)</th>
+                                                <th>Predicción (ug/m³)</th>
+                                                <th>Error (ug/m³)</th>
+                                                <th>Error %</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="val-pm10-opcion-b"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OPCION C: RESUMEN ESTADISTICO -->
+                    <div id="val-opcion-c" class="tab-pane fade">
+                        <p class="small text-muted mb-3">Resumen estadístico: Mín, Q1, Mediana, Q3, Máx, Promedio de predicciones vs reales</p>
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <h6 class="text-primary small mb-2">PM2.5 - Resumen Estadístico del Set de PRUEBA</h6>
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Estadístico</th>
+                                            <th>Real (ug/m³)</th>
+                                            <th>Predicción (ug/m³)</th>
+                                            <th>Error (ug/m³)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="val-pm25-opcion-c"></tbody>
+                                </table>
+                            </div>
+                            <div class="col-lg-6">
+                                <h6 class="text-success small mb-2">PM10 - Resumen Estadístico del Set de PRUEBA</h6>
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Estadístico</th>
+                                            <th>Real (ug/m³)</th>
+                                            <th>Predicción (ug/m³)</th>
+                                            <th>Error (ug/m³)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="val-pm10-opcion-c"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 6: GRAFICOS -->
+        <div class="row mb-5" id="charts-section" style="display: none;">
+            <div class="col-lg-12">
+                <h4 class="text-primary mb-3">📈 Gráficos Avanzados de Evaluación</h4>
+            </div>
+
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">PM2.5: Análisis Completo (Regresión + Clasificación + Residuos)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="pm25-chart-container" class="text-center">
+                            <img id="pm25-chart" src="" alt="PM2.5 Predictions" class="img-fluid" style="max-width: 100%; height: auto;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-12 mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">PM10: Análisis Completo (Regresión + Clasificación + Residuos)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="pm10-chart-container" class="text-center">
+                            <img id="pm10-chart" src="" alt="PM10 Predictions" class="img-fluid" style="max-width: 100%; height: auto;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 7: INFORMACION DEL MODELO -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <h4 class="text-info mb-4">🧠 Información Técnica del Modelo</h4>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Arquitectura</h5>
+                    </div>
+                    <div class="card-body small">
+                        <ul class="list-unstyled">
+                            <li><strong>Tipo:</strong> LightGBM Híbrido</li>
+                            <li><strong>Componentes:</strong> Regresión + Clasificación</li>
+                            <li><strong>Modelos:</strong> 4 total (PM2.5 Reg, PM2.5 Clf, PM10 Reg, PM10 Clf)</li>
+                            <li><strong>Features totales:</strong> 24</li>
+                            <li><strong>Horizonte predicción:</strong> +1 hora (t+1)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Datos de Entrenamiento</h5>
+                    </div>
+                    <div class="card-body small">
+                        <ul class="list-unstyled">
+                            <li><strong>Fuente:</strong> RMCAB (Datos REALES)</li>
+                            <li><strong>Período total:</strong> 1 Ene - 31 Dic 2025</li>
+                            <li><strong>Total registros:</strong> 8,760 horas (todo el año)</li>
+                            <li><strong>Split temporal:</strong> 75% train, 25% test</li>
+                            <li><strong>Ventana histórica:</strong> 24 horas (lookback)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Features del Modelo</h5>
+                    </div>
+                    <div class="card-body small">
+                        <ul class="list-unstyled">
+                            <li><strong>Meteorológicos:</strong> Temp, HR, Presión, Viento</li>
+                            <li><strong>Históricos:</strong> PM25/PM10 (últimas 24h)</li>
+                            <li><strong>Derivados:</strong> Cambios, promedios móviles</li>
+                            <li><strong>Temporales:</strong> Hora, día, mes, estación</li>
+                            <li><strong>Trigonométricos:</strong> Seno/Coseno para ciclos</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 8: CARACTERISTICAS -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">✨ Características y Validación del Modelo</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold mb-3">Ventajas del Enfoque:</h6>
+                                <ul class="small">
+                                    <li>✓ Usa datos REALES de RMCAB (no datos sintéticos)</li>
+                                    <li>✓ Split temporal respeta orden cronológico</li>
+                                    <li>✓ Dos tipos de predicción: valores exactos + categorías</li>
+                                    <li>✓ Features incluyen ciclos diarios y estacionales</li>
+                                    <li>✓ LightGBM maneja bien datos complejos y no lineales</li>
+                                    <li>✓ Early stopping previene overfitting</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="fw-bold mb-3">Validación Rigurosa:</h6>
+                                <ul class="small">
+                                    <li>✓ Datos de prueba son del futuro (no entrenamiento)</li>
+                                    <li>✓ Métrica R² mide varianza explicada</li>
+                                    <li>✓ RMSE y MAE independientes (complementarios)</li>
+                                    <li>✓ MAPE permite comparación porcentual</li>
+                                    <li>✓ Accuracy valida clasificación (Bajo/Medio/Alto)</li>
+                                    <li>✓ Gráficos muestran residuos y patrones</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="alert alert-warning small mt-3 mb-0">
+                            <strong>⚠️ Limitación importante:</strong> El modelo aprende de datos enero-octubre y se evalúa en octubre-diciembre.
+                            Cambios abruptos de clima o eventos especiales en los meses de prueba pueden afectar la precisión.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Estilos -->
+<style>
+    .metric-badge {
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+    }
+
+    .metric-value {
+        font-size: 1.3rem;
+        font-weight: bold;
+    }
+
+    #progress-bar {
+        transition: width 0.3s ease;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    .text-justify {
+        text-align: justify;
+    }
+</style>
+
+<!-- JavaScript -->
+<script>
+async function trainPredictor() {
+    const trainBtn = document.getElementById('train-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const status = document.getElementById('status');
+
+    // Ocultar todas las secciones de resultados mientras se entrena
+    document.getElementById('metrics-section').style.display = 'none';
+    document.getElementById('interpretation-section').style.display = 'none';
+    document.getElementById('validation-section').style.display = 'none';
+    document.getElementById('charts-section').style.display = 'none';
+
+    // Deshabilitar botón y mostrar progreso
+    trainBtn.disabled = true;
+    trainBtn.textContent = '⏳ Entrenando...';
+    progressContainer.classList.remove('d-none');
+
+    try {
+        // Inicio
+        progressBar.style.width = '5%';
+        progressText.textContent = 'Inicializando... Cargando 8,760 horas de datos REALES de RMCAB...';
+        status.innerHTML = '<span class="badge bg-warning">⏳ Cargando datos...</span>';
+
+        console.log('Llamando endpoint de entrenamiento...');
+
+        const response = await fetch('/api/objetivo2/train-predictor', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        progressBar.style.width = '30%';
+        progressText.textContent = 'Datos cargados ✓. Mejorando características meteorológicas con ciclos realistas...';
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+        }
+
+        progressBar.style.width = '50%';
+        progressText.textContent = 'Agregando features derivadas (cambios, promedios móviles, percentiles)...';
+
+        const data = await response.json();
+
+        progressBar.style.width = '70%';
+        progressText.textContent = 'Entrenando 4 modelos LightGBM (Regresión PM2.5, Clasificación PM2.5, Regresión PM10, Clasificación PM10)...';
+
+        if (data.status === 'success') {
+            progressBar.style.width = '85%';
+            progressText.textContent = 'Calculando métricas de validación en set de PRUEBA...';
+
+            displayMetrics(data.results);
+
+            progressBar.style.width = '95%';
+            progressText.textContent = 'Generando gráficos avanzados...';
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            displayCharts();
+
+            progressBar.style.width = '100%';
+            progressText.textContent = 'Completado exitosamente ✓';
+            status.innerHTML = '<span class="badge bg-success">✓ Modelo entrenado y evaluado exitosamente</span>';
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+            document.getElementById('metrics-section').style.display = 'block';
+            document.getElementById('interpretation-section').style.display = 'block';
+            document.getElementById('validation-section').style.display = 'block';
+            document.getElementById('charts-section').style.display = 'block';
+
+            console.log('Cargando datos de validación...');
+            await loadValidationData();
+
+            setTimeout(() => {
+                document.getElementById('metrics-section').scrollIntoView({ behavior: 'smooth' });
+            }, 500);
+        } else {
+            throw new Error(data.message || 'Error desconocido en el servidor');
+        }
+
+        resetBtn.classList.remove('d-none');
+
+    } catch (error) {
+        console.error('Error detallado:', error);
+        status.innerHTML = `<span class="badge bg-danger">✗ Error: ${error.message}</span>`;
+        progressText.textContent = `Error: ${error.message}`;
+        progressBar.style.width = '0%';
+        alert('Error al entrenar el modelo:\n\n' + error.message);
+        trainBtn.disabled = false;
+        trainBtn.textContent = '🧠 Entrenar Modelo';
+    }
+}
+
+function displayMetrics(results) {
+    console.log('displayMetrics called with results:', results);
+
+    if (results.pm25 && results.pm25.regression) {
+        const r = results.pm25.regression;
+        document.getElementById('pm25-r2').textContent = r.r2.toFixed(4);
+        document.getElementById('pm25-rmse').textContent = r.rmse.toFixed(4);
+        document.getElementById('pm25-mae').textContent = r.mae.toFixed(4);
+        document.getElementById('pm25-mape').textContent = r.mape.toFixed(2) + '%';
+    }
+
+    if (results.pm25 && results.pm25.classification) {
+        const c = results.pm25.classification;
+        document.getElementById('pm25-acc').textContent = (c.accuracy * 100).toFixed(1) + '%';
+    }
+
+    if (results.pm10 && results.pm10.regression) {
+        const r = results.pm10.regression;
+        document.getElementById('pm10-r2').textContent = r.r2.toFixed(4);
+        document.getElementById('pm10-rmse').textContent = r.rmse.toFixed(4);
+        document.getElementById('pm10-mae').textContent = r.mae.toFixed(4);
+        document.getElementById('pm10-mape').textContent = r.mape.toFixed(2) + '%';
+    }
+
+    if (results.pm10 && results.pm10.classification) {
+        const c = results.pm10.classification;
+        document.getElementById('pm10-acc').textContent = (c.accuracy * 100).toFixed(1) + '%';
+    }
+
+    console.log('displayMetrics completed');
+}
+
+function displayCharts() {
+    const timestamp = Date.now();
+    const charts = [
+        { id: 'pm25-chart', file: 'advanced_evaluation_pm25.png', name: 'PM2.5' },
+        { id: 'pm10-chart', file: 'advanced_evaluation_pm10.png', name: 'PM10' }
+    ];
+
+    charts.forEach(chart => {
+        const img = document.getElementById(chart.id);
+        const container = img.parentElement;
+
+        const newImg = new Image();
+        newImg.src = `/static/results/${chart.file}?t=${timestamp}`;
+
+        newImg.onload = function() {
+            console.log(`✓ Gráfico ${chart.name} cargado`);
+            img.src = newImg.src;
+        };
+
+        newImg.onerror = function() {
+            console.error(`✗ Error al cargar ${chart.file}`);
+            container.innerHTML = `
+                <div class="alert alert-warning">
+                    <strong>⚠️ Error al cargar gráfico ${chart.name}</strong><br>
+                    <small>Archivo: ${chart.file}</small>
+                </div>
+            `;
+        };
+
+        setTimeout(() => {
+            if (!newImg.complete) {
+                console.error(`Timeout al cargar ${chart.file}`);
+                container.innerHTML = `
+                    <div class="alert alert-warning">
+                        <strong>⚠️ Timeout al cargar gráfico ${chart.name}</strong>
+                    </div>
+                `;
+            }
+        }, 30000);
+    });
+}
+
+function resetModel() {
+    document.getElementById('train-btn').disabled = false;
+    document.getElementById('train-btn').textContent = '🧠 Entrenar Modelo';
+    document.getElementById('reset-btn').classList.add('d-none');
+    document.getElementById('progress-container').classList.add('d-none');
+    document.getElementById('status').innerHTML = '<span class="badge bg-secondary">No entrenado</span>';
+
+    document.getElementById('metrics-section').style.display = 'none';
+    document.getElementById('interpretation-section').style.display = 'none';
+    document.getElementById('validation-section').style.display = 'none';
+    document.getElementById('charts-section').style.display = 'none';
+
+    ['pm25-r2', 'pm25-rmse', 'pm25-mae', 'pm25-mape', 'pm25-acc',
+     'pm10-r2', 'pm10-rmse', 'pm10-mae', 'pm10-mape', 'pm10-acc'].forEach(id => {
+        const elem = document.getElementById(id);
+        if (elem) elem.textContent = '--';
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function loadValidationData() {
+    try {
+        console.log('Fetching validation data from API...');
+        const response = await fetch('/api/objetivo2/validation-data');
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Failed to fetch validation data`);
+        }
+
+        const data = await response.json();
+        console.log('Validation data received:', data);
+
+        if (!data.validation) {
+            console.warn('No validation data in response');
+            return;
+        }
+
+        for (const pollutant of ['pm25', 'pm10']) {
+            const pollData = data.validation[pollutant];
+            if (!pollData) continue;
+
+            populateTableOpcionA(pollutant, pollData.opcion_a);
+            populateTableOpcionB(pollutant, pollData.opcion_b);
+            populateTableOpcionC(pollutant, pollData.opcion_c);
+        }
+
+        console.log('Validation tables populated successfully');
+    } catch (error) {
+        console.error('Error loading validation data:', error);
+        const validationSection = document.getElementById('validation-section');
+        if (validationSection) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-warning mt-3';
+            errorDiv.innerHTML = `<strong>⚠️ Error al cargar datos de validación:</strong> ${error.message}`;
+            validationSection.appendChild(errorDiv);
+        }
+    }
+}
+
+function populateTableOpcionA(pollutant, data) {
+    const tableId = `val-pm${pollutant === 'pm25' ? '25' : '10'}-opcion-a`;
+    const tbody = document.getElementById(tableId);
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No hay datos</td></tr>';
+        return;
+    }
+
+    data.forEach(row => {
+        const tr = document.createElement('tr');
+        const errorColor = Math.abs(row.error) < 5 ? 'table-success' : Math.abs(row.error) < 10 ? 'table-warning' : 'table-danger';
+        tr.className = errorColor;
+        tr.innerHTML = `
+            <td><small>${row.idx}</small></td>
+            <td><small><strong>${parseFloat(row.real).toFixed(2)}</strong></small></td>
+            <td><small>${parseFloat(row.predicho).toFixed(2)}</small></td>
+            <td><small>${parseFloat(row.error).toFixed(2)}</small></td>
+            <td><small>${parseFloat(row.error_pct).toFixed(1)}%</small></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function populateTableOpcionB(pollutant, data) {
+    const tableId = `val-pm${pollutant === 'pm25' ? '25' : '10'}-opcion-b`;
+    const tbody = document.getElementById(tableId);
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No hay datos</td></tr>';
+        return;
+    }
+
+    data.forEach(row => {
+        const tr = document.createElement('tr');
+        const errorColor = Math.abs(row.error) < 5 ? 'table-success' : Math.abs(row.error) < 10 ? 'table-warning' : 'table-danger';
+        tr.className = errorColor;
+        tr.innerHTML = `
+            <td><small>${row.idx}</small></td>
+            <td><small><strong>${parseFloat(row.real).toFixed(2)}</strong></small></td>
+            <td><small>${parseFloat(row.predicho).toFixed(2)}</small></td>
+            <td><small>${parseFloat(row.error).toFixed(2)}</small></td>
+            <td><small>${parseFloat(row.error_pct).toFixed(1)}%</small></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function populateTableOpcionC(pollutant, stats) {
+    const tableId = `val-pm${pollutant === 'pm25' ? '25' : '10'}-opcion-c`;
+    const tbody = document.getElementById(tableId);
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    if (!stats) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No hay datos</td></tr>';
+        return;
+    }
+
+    const statsData = [
+        { label: 'Mínimo', real: stats.real?.min, predicho: stats.predicho?.min, error: stats.error?.min },
+        { label: 'Q1 (25%)', real: stats.real?.q1, predicho: stats.predicho?.q1, error: stats.error?.q1 },
+        { label: 'Q2 (Mediana)', real: stats.real?.q2, predicho: stats.predicho?.q2, error: stats.error?.q2 },
+        { label: 'Q3 (75%)', real: stats.real?.q3, predicho: stats.predicho?.q3, error: stats.error?.q3 },
+        { label: 'Máximo', real: stats.real?.max, predicho: stats.predicho?.max, error: stats.error?.max },
+        { label: 'Promedio', real: stats.real?.mean, predicho: stats.predicho?.mean, error: stats.error?.mean }
+    ];
+
+    statsData.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${row.label}</strong></td>
+            <td><small>${row.real !== undefined ? parseFloat(row.real).toFixed(2) : '-'}</small></td>
+            <td><small>${row.predicho !== undefined ? parseFloat(row.predicho).toFixed(2) : '-'}</small></td>
+            <td><small>${row.error !== undefined ? parseFloat(row.error).toFixed(2) : '-'}</small></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+</script>
+
+{% endblock %}

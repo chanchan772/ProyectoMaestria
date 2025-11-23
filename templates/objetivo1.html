@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section fade-in">
+    <div class="container">
+        <div class="row text-center mb-5">
+            <div class="col-md-10 mx-auto">
+                <h2 class="section-title">Objetivo 1: Calibración Avanzada de Sensores</h2>
+                <p class="section-subtitle">
+                    Evaluar y calibrar sensores de bajo costo instalados en la estación de Las Ferias en Bogotá, comparando sus lecturas con la estación oficial de referencia para determinar degradación, aplicar modelos de Machine Learning y generar conclusiones sobre su estado operativo.
+                </p>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 1: CONTEXTO Y DESCRIPCIÓN -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <h4 class="text-success mb-3">🎯 Contexto del Proyecto</h4>
+            </div>
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Descripción del Caso de Estudio</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold">📍 Ubicación de Estudio</h6>
+                                <ul class="small">
+                                    <li><strong>Estación:</strong> Las Ferias, Bogotá</li>
+                                    <li><strong>Sensores evaluados:</strong> 3 sensores de bajo costo (Aire2, Aire4, Aire5)</li>
+                                    <li><strong>Estación de referencia:</strong> Las Ferias (RMCAB)</li>
+                                    <li><strong>Período de análisis:</strong> 1 junio - 30 julio 2025</li>
+                                    <li><strong>Variable monitoreada:</strong> PM2.5 (Material Particulado Fino)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="fw-bold">⚠️ Problema a Investigar</h6>
+                                <p class="small">
+                                    Los sensores de bajo costo tienen una degradación con el tiempo que afecta su precisión. Se espera que el R² haya caído significativamente desde los 0.80 que tenían cuando eran nuevos.
+                                </p>
+                                <h6 class="fw-bold mt-3">🔍 Pregunta de Investigación</h6>
+                                <p class="small">
+                                    ¿Es posible mediante calibración con ML recuperar la precisión de los sensores degradados? ¿O se recomienda su reemplazo?
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 2: CARGA Y VISUALIZACIÓN DE DATOS -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <h4 class="text-primary mb-3">📊 Visualización y Análisis de Datos</h4>
+                <div class="mb-3">
+                    <button id="btnInitData" class="btn btn-primary btn-lg">
+                        <span id="btnInitText">📥 Cargar y Procesar Datos</span>
+                        <span id="btnInitSpinner" class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true" style="display: none;"></span>
+                    </button>
+                </div>
+                <div id="loadingAlert" class="alert alert-info" role="alert" style="display: none;">
+                    <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+                    <span id="loadingText">Procesando datos...</span>
+                </div>
+                <div id="errorAlert" class="alert alert-danger" role="alert" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Comparación Visual de Series de Tiempo con Tabs -->
+        <div class="row g-4 mb-5" id="timeseriesSection" style="display: none;">
+            <div class="col-lg-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Series de Tiempo: Sensores vs Estación Oficial (RMCAB)</h5>
+                        <!-- Tabs para PM2.5 y PM10 -->
+                        <ul class="nav nav-tabs nav-tabs-primary mt-3" id="timeseriesTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="pm25-timeseries-tab" data-bs-toggle="tab" data-bs-target="#pm25-timeseries-pane" type="button" role="tab" aria-controls="pm25-timeseries-pane" aria-selected="true">
+                                    PM2.5
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="pm10-timeseries-tab" data-bs-toggle="tab" data-bs-target="#pm10-timeseries-pane" type="button" role="tab" aria-controls="pm10-timeseries-pane" aria-selected="false">
+                                    PM10
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div class="tab-content" id="timeseriesTabContent">
+                            <!-- Tab PM2.5 -->
+                            <div class="tab-pane fade show active" id="pm25-timeseries-pane" role="tabpanel" aria-labelledby="pm25-timeseries-tab">
+                                <div class="alert alert-info small mb-3" role="alert">
+                                    <strong>ℹ️ Nota:</strong> Gráfico interactivo con los tres sensores de bajo costo (Aire2, Aire4, Aire5) y la medición oficial RMCAB. Puede hacer zoom y desplazarse sobre el gráfico.
+                                </div>
+                                <div id="timeseriesChart" style="width:100%; height:500px;"></div>
+                            </div>
+                            <!-- Tab PM10 -->
+                            <div class="tab-pane fade" id="pm10-timeseries-pane" role="tabpanel" aria-labelledby="pm10-timeseries-tab">
+                                <div class="alert alert-info small mb-3" role="alert">
+                                    <strong>ℹ️ Nota:</strong> Gráfico interactivo con los tres sensores de bajo costo (Aire2, Aire4, Aire5) y la medición oficial RMCAB. Puede hacer zoom y desplazarse sobre el gráfico.
+                                </div>
+                                <div id="pm10Chart" style="width:100%; height:500px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparación Cruda: Scatter Plots con Tabs -->
+        <div class="row mb-5" id="scatterSection" style="display: none;">
+            <div class="col-lg-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Comparación de Datos "Crudos" (Sin Calibrar): Sensores vs RMCAB</h5>
+                        <!-- Tabs para PM2.5 y PM10 -->
+                        <ul class="nav nav-tabs nav-tabs-primary mt-3" id="scatterTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="pm25-scatter-tab" data-bs-toggle="tab" data-bs-target="#pm25-scatter-pane" type="button" role="tab" aria-controls="pm25-scatter-pane" aria-selected="true">
+                                    PM2.5
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="pm10-scatter-tab" data-bs-toggle="tab" data-bs-target="#pm10-scatter-pane" type="button" role="tab" aria-controls="pm10-scatter-pane" aria-selected="false">
+                                    PM10
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-3">
+                            Los scatter plots a continuación comparan cada sensor de bajo costo contra la estación oficial de referencia. Idealmente, todos los puntos deberían estar cerca de la línea diagonal roja (y=x). La distancia desde esta línea indica el grado de error.
+                        </p>
+
+                        <div class="tab-content" id="scatterTabContent">
+                            <!-- Tab PM2.5 -->
+                            <div class="tab-pane fade show active" id="pm25-scatter-pane" role="tabpanel" aria-labelledby="pm25-scatter-tab">
+                                <div id="scatterPM25" style="height: 480px;"></div>
+                                <div class="alert alert-light small mt-3 mb-0" role="alert">
+                                    <strong>Nota:</strong> Comparación de datos PM2.5 crudos contra la estación de referencia RMCAB. Los puntos cercanos a la diagonal roja (y=x) indican buena concordancia.
+                                </div>
+                            </div>
+                            <!-- Tab PM10 -->
+                            <div class="tab-pane fade" id="pm10-scatter-pane" role="tabpanel" aria-labelledby="pm10-scatter-tab">
+                                <div id="scatterPM10" style="height: 480px;"></div>
+                                <div class="alert alert-light small mt-3 mb-0" role="alert">
+                                    <strong>Nota:</strong> Comparación de datos PM10 crudos contra la estación de referencia RMCAB. Los puntos cercanos a la diagonal roja (y=x) indican buena concordancia.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 3: CALIBRACIÓN AVANZADA MULTI-RANGO TEMPORAL -->
+        <div class="row mb-5" id="calibrationSection" style="display: none;">
+            <div class="col-lg-12">
+                <h4 class="text-info mb-3">🤖 Calibración Avanzada: Multi-Rango Temporal</h4>
+            </div>
+        </div>
+
+        <!-- Botón de Calibración -->
+        <div class="row g-4 mb-4" id="calibrationButtonSection" style="display: none;">
+            <div class="col-lg-12">
+                <button id="btnCalibrate" class="btn btn-info btn-lg">
+                    <span id="btnCalibrateText">⚙️ Ejecutar Calibración Completa</span>
+                    <span id="btnCalibrateSpinner" class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true" style="display: none;"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Indicador de Progreso -->
+        <div class="row mb-4" id="calibrationProgressSection" style="display: none;">
+            <div class="col-lg-12">
+                <div class="alert alert-info" role="alert">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-3" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <div>
+                            <strong id="calibrationProgressText">Ejecutando calibración en múltiples rangos temporales...</strong>
+                            <div class="progress mt-2" style="width: 100%; height: 20px;">
+                                <div id="calibrationProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resultados de Calibración Independiente por Sensor y Partícula -->
+        <div class="row g-4 mb-5" id="calibrationResultsSection" style="display: none;">
+            <div class="col-lg-12">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Resultados de Calibración: Análisis Independiente por Sensor</h5>
+                        <p class="small mb-0 mt-2">Calibraciones independientes para cada sensor y tipo de partícula en diferentes ventanas de tiempo</p>
+
+                        <!-- Tabs principales: Sensores (Aire2, Aire4, Aire5) - Generadas dinámicamente -->
+                        <ul class="nav nav-tabs nav-tabs-primary mt-3" id="calibrationMainTabs" role="tablist">
+                            <!-- Se generarán dinámicamente desde JavaScript -->
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div class="tab-content" id="calibrationMainTabContent">
+                            <!-- Contenido de pestañas generado dinámicamente por JavaScript -->
+                        </div>
+
+                        <div class="alert alert-warning small mt-4" role="alert">
+                            <strong>📌 Nota:</strong> Los valores de R², RMSE, MAE y MAPE se calculan en el conjunto de prueba (25% de los datos). R² ≥ 0.8 indica buen ajuste. Un R² alto en rangos cortos pero bajo en el período completo sugiere degradación del sensor.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+                        <div class="alert alert-warning small mt-4" role="alert">
+                            <strong>📌 Nota:</strong> Los valores de R², RMSE, MAE y MAPE se calculan en el conjunto de prueba (25% de los datos). R² ≥ 0.8 indica buen ajuste. Un R² alto en rangos cortos pero bajo en el período completo sugiere degradación del sensor.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Degradation Comparison Chart -->
+        <div class="row g-4 mb-5" id="degradationSection" style="display: none;">
+            <div class="col-lg-12">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Análisis de Degradación: Crudo vs Calibrado</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted">
+                            Comparación visual del R² antes y después de la calibración. Un aumento significativo indica que la calibración fue efectiva.
+                        </p>
+                        <div id="degradationChart" style="width:100%; height:400px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Time Range Analysis -->
+        <div class="row g-4 mb-5" id="timeRangeSection" style="display: none;">
+            <div class="col-lg-12">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Análisis de Rangos Temporales</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted">
+                            Evaluación de la calibración en diferentes ventanas de tiempo para identificar si el sensor mejora cuando se usan rangos más cortos (últimos N días).
+                        </p>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover" id="timeRangeTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Sensor</th>
+                                        <th>Mejor Rango</th>
+                                        <th>R² Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="timeRangeTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="alert alert-info small mt-3" role="alert">
+                            <strong>💡 Interpretación:</strong> Si el mejor R² se logra en rangos cortos (2-5 días) significa degradación gradual. Si es consistente en todos los rangos, el sensor es estable.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 4: CONCLUSIONES AUTOMÁTICAS -->
+        <div class="row mb-5" id="conclusionsSection" style="display: none;">
+            <div class="col-lg-12">
+                <h4 class="text-warning mb-3">🎓 Análisis de Resultados y Conclusiones</h4>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-5" id="conclusionCardSection" style="display: none;">
+            <div class="col-lg-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">Evaluación de Degradación de Sensores</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="conclusionsContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recomendaciones -->
+        <div class="row" id="recommendationsSection" style="display: none;">
+            <div class="col-lg-12">
+                <div class="card border-success shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">✅ Recomendaciones Finales</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="recommendationsContent"></div>
+
+                        <div class="row mt-4">
+                            <div class="col-md-4">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title fw-bold">Escenario 1: Buen Ajuste</h6>
+                                        <p class="small">
+                                            Si R² &gt; 0.75 en todo el período, <strong>los sensores pueden seguir en uso</strong> aplicando el modelo de calibración identificado.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title fw-bold">Escenario 2: Degradación</h6>
+                                        <p class="small">
+                                            Si buen R² solo en rangos cortos, los sensores tienen <strong>degradación severa</strong> y deberían ser reemplazados.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title fw-bold">Escenario 3: Inutilizable</h6>
+                                        <p class="small">
+                                            Si R² &lt; 0.60 incluso calibrado, <strong>reemplazo inmediato</strong>.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Plotly Library -->
+<script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+
+<!-- Custom JS for Objetivo 1 -->
+<script src="{{ url_for('static', filename='js/objetivo1.js') }}"></script>
+{% endblock %}

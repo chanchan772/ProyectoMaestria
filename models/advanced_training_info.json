@@ -1,0 +1,27 @@
+{
+  "pm25": {
+    "regression": {
+      "rmse": 0.6433866568062975,
+      "mae": 0.5073003176440704,
+      "r2": 0.880994732177114,
+      "mape": 7.240979190622577
+    },
+    "classification": {
+      "accuracy": 1.0
+    }
+  },
+  "pm10": {
+    "regression": {
+      "rmse": 0.9619097676057193,
+      "mae": 0.7623223660982792,
+      "r2": 0.8941303111543725,
+      "mape": 6.267464483591232
+    },
+    "classification": {
+      "accuracy": 1.0
+    }
+  },
+  "trained_at": "2025-11-23T09:40:30.147064",
+  "features": 28,
+  "approach": "Hybrid Regression + Classification with Enhanced Meteorology"
+}

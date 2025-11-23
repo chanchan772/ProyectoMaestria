@@ -1,0 +1,181 @@
+================================================================================
+    OBJETIVO 1 - CALIBRACIÓN AVANZADA DE SENSORES
+    GUÍA RÁPIDA DE INICIO
+================================================================================
+
+🚀 PASO 1: INICIAR EL SERVIDOR
+────────────────────────────────────────────────────────────────────────────
+
+1. Abre una consola (cmd, PowerShell, o terminal)
+2. Navega a la carpeta "fase 4":
+
+   cd "C:\Users\Sebastian\Documents\Maestria\Proyecto Maestria 23 Sep\fase 4"
+
+3. Ejecuta el servidor Flask:
+
+   python app.py
+
+4. Deberías ver:
+
+   WARNING in app.run_simple - This is a development server...
+    * Running on http://127.0.0.1:5000
+    * Press CTRL+C to quit
+
+⚠️  NO CIERRES ESTA CONSOLA MIENTRAS USES LA APLICACIÓN
+
+────────────────────────────────────────────────────────────────────────────
+
+🌐 PASO 2: ACCEDER A LA PÁGINA
+────────────────────────────────────────────────────────────────────────────
+
+1. Abre tu navegador (Chrome, Firefox, Edge, etc.)
+2. Escribe en la barra de direcciones:
+
+   http://127.0.0.1:5000/objetivo-1
+
+3. Deberías ver la página "Objetivo 1: Calibración Avanzada de Sensores"
+
+────────────────────────────────────────────────────────────────────────────
+
+📥 PASO 3: CARGAR DATOS
+────────────────────────────────────────────────────────────────────────────
+
+1. Haz clic en el botón: "📥 Cargar y Procesar Datos"
+2. Verás un indicador de carga (spinner)
+3. ESPERA 5-10 segundos
+4. Deberías ver:
+   ✓ Gráfico de serie temporal (4 líneas: 3 sensores + RMCAB)
+   ✓ 3 gráficos de scatter plot (Aire2, Aire4, Aire5)
+   ✓ Métricas R² y RMSE para cada sensor
+
+────────────────────────────────────────────────────────────────────────────
+
+⚙️  PASO 4: EJECUTAR CALIBRACIÓN
+────────────────────────────────────────────────────────────────────────────
+
+1. Haz clic en: "⚙️ Ejecutar Calibración Completa"
+2. ESPERA 10-15 segundos (entrena 12 modelos)
+3. Deberías ver:
+   ✓ Tabla con resultados (R², RMSE, MAE, MAPE)
+   ✓ "Mejor Modelo por Sensor"
+   ✓ Gráfico de degradación (Crudo vs Calibrado)
+   ✓ Análisis de conclusiones y recomendaciones
+
+────────────────────────────────────────────────────────────────────────────
+
+📅 PASO 5: ANALIZAR RANGOS TEMPORALES (OPCIONAL)
+────────────────────────────────────────────────────────────────────────────
+
+1. Haz clic en: "📅 Probar Rangos de Tiempo"
+2. ESPERA 20-30 segundos
+3. Verá tabla con mejores rangos por sensor
+
+────────────────────────────────────────────────────────────────────────────
+
+❌ SOLUCIÓN DE PROBLEMAS
+────────────────────────────────────────────────────────────────────────────
+
+PROBLEMA: "No se carga nada"
+SOLUCIÓN:
+  1. Presiona F12 para abrir Developer Tools
+  2. Haz clic en la pestaña "Console"
+  3. Busca mensajes que comiencen con [Objetivo1] o [handleInitData]
+  4. Si ves "Iniciando carga de datos..." = el JavaScript funciona
+  5. Si hay errores en rojo, cópialos y comprueba si el servidor está corriendo
+
+PROBLEMA: "Error: Failed to fetch"
+SOLUCIÓN:
+  1. Verifica que la consola del servidor muestra "Running on http://127.0.0.1:5000"
+  2. No cierres esa consola
+  3. Recarga la página (Ctrl+F5)
+
+PROBLEMA: "Los gráficos están en blanco"
+SOLUCIÓN:
+  1. Presiona F12 → Console
+  2. Busca "Plotly" en los errores
+  3. Recarga la página (Ctrl+F5)
+
+PROBLEMA: "Demora mucho tiempo"
+SOLUCIÓN: Esto es normal:
+  • Cargar datos: 5-10 segundos
+  • Calibración: 10-15 segundos
+  • Análisis de rangos: 20-30 segundos
+
+────────────────────────────────────────────────────────────────────────────
+
+📊 DATOS ESPERADOS
+────────────────────────────────────────────────────────────────────────────
+
+Datos Crudos (Sin Calibración):
+  Aire2: R² ≈ 0.77, RMSE ≈ 5.2
+  Aire4: R² ≈ 0.67, RMSE ≈ 6.2
+  Aire5: R² ≈ 0.81, RMSE ≈ 4.8
+
+Después de Calibración (Gradient Boosting):
+  Aire2: R² ≈ 0.94, RMSE ≈ 1.8
+  Aire4: R² ≈ 0.95, RMSE ≈ 1.5
+  Aire5: R² ≈ 0.94, RMSE ≈ 1.9
+
+MEJORA: +20% a +25% en R²
+
+────────────────────────────────────────────────────────────────────────────
+
+🔍 DEBUGGING AVANZADO
+────────────────────────────────────────────────────────────────────────────
+
+Para ver logs detallados:
+  1. Abre la consola del navegador (F12)
+  2. Haz clic en el botón
+  3. Mira los logs en tiempo real que comienzan con [Objetivo1]
+
+Ejemplo de logs esperados:
+  [Objetivo1] DOM cargado, inicializando...
+  [Objetivo1] Event listeners configurados.
+  [handleInitData] Iniciando carga de datos...
+  [handleInitData] Llamando a /api/objetivo1/initialize...
+  [handleInitData] Respuesta recibida: 200
+  [loadTimeseries] Gráfico renderizado exitosamente
+  [loadScatterPlots] Completado exitosamente
+
+────────────────────────────────────────────────────────────────────────────
+
+📁 ARCHIVOS IMPORTANTES
+────────────────────────────────────────────────────────────────────────────
+
+fase 4/
+├── app.py                    ← Servidor Flask (ejecuta esto)
+├── modules/
+│   ├── data_processor.py     ← Carga datos
+│   ├── calibration.py        ← Modelos ML
+│   └── visualization.py      ← Gráficos
+├── templates/
+│   └── objetivo1.html        ← Página web
+└── static/js/
+    └── objetivo1.js          ← JavaScript
+
+────────────────────────────────────────────────────────────────────────────
+
+✅ CHECKLIST
+────────────────────────────────────────────────────────────────────────────
+
+ ☐ Ejecuté: python app.py
+ ☐ Servidor está corriendo en: http://127.0.0.1:5000
+ ☐ Abrí: http://127.0.0.1:5000/objetivo-1
+ ☐ Hice clic en "Cargar y Procesar Datos"
+ ☐ Vi los gráficos de series de tiempo y scatter plots
+ ☐ Hice clic en "Ejecutar Calibración Completa"
+ ☐ Vi tabla de resultados y conclusiones
+ ☐ F12 (consola) no muestra errores en rojo
+
+────────────────────────────────────────────────────────────────────────────
+
+¿PROBLEMAS?
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. Presiona F12                                                         │
+│ 2. Haz clic en pestaña "Console"                                        │
+│ 3. Busca mensajes que empiezan con "[Objetivo1]" o "[handleInitData]"  │
+│ 4. Si hay errores en rojo, cópialos completos                          │
+│ 5. Verifica que python app.py está corriendo sin errores                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================

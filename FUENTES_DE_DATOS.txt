@@ -1,0 +1,177 @@
+================================================================================
+                    📊 FUENTES DE DATOS - OBJETIVO 2
+================================================================================
+
+ACLARACIÓN IMPORTANTE:
+El modelo predictivo LSTM SOLO usa datos de RMCAB, NO PostgreSQL
+
+================================================================================
+¿DE DÓNDE VIENE CADA DATO?
+================================================================================
+
+1. PM2.5 (Histórico Real)
+   ├─ FUENTE: data_rmcab/rmcab_data.csv
+   ├─ ORIGEN: Descargado con Postman desde API RMCAB
+   ├─ TIPO: REAL (datos verificados de estación de referencia)
+   ├─ PERÍODO: Junio-Julio 2025
+   └─ VARIABLE: pm25_ref
+
+2. PM10 (Histórico Real)
+   ├─ FUENTE: data_rmcab/rmcab_data.csv
+   ├─ ORIGEN: Descargado con Postman desde API RMCAB
+   ├─ TIPO: REAL (datos verificados de estación de referencia)
+   ├─ PERÍODO: Junio-Julio 2025
+   └─ VARIABLE: pm10_ref
+
+3. Temperatura (Simulada)
+   ├─ FUENTE: Generada en modules/data_processor.py
+   ├─ MÉTODO: Función _simulate_environmental_data()
+   ├─ TIPO: SINTÉTICA (patrón sinusoidal + ruido)
+   ├─ BASADO: Clima de Bogotá (18°C base, ±5°C variación)
+   └─ VARIABLE: temperature
+
+4. Humedad Relativa (Simulada)
+   ├─ FUENTE: Generada en modules/data_processor.py
+   ├─ MÉTODO: Función _simulate_environmental_data()
+   ├─ TIPO: SINTÉTICA (patrón inverso a temperatura + ruido)
+   ├─ BASADO: Clima de Bogotá (75% base, ±15% variación)
+   └─ VARIABLE: rh
+
+================================================================================
+¿QUÉ NO SE USA?
+================================================================================
+
+❌ PostgreSQL
+   └─ Razón: Sensores Aire2, Aire4, Aire5 están degradados y no confiables
+
+❌ Sensores Aire2, Aire4, Aire5
+   └─ Razón: Alto desgaste, calibración deficiente
+            → Por eso se necesita modelo predictivo
+
+❌ API RMCAB en Tiempo Real
+   └─ Razón: Datos descargados previamente en CSV (más eficiente)
+            → Se evita hacer requests repetidos a la API
+
+================================================================================
+¿POR QUÉ ESTA ESTRUCTURA?
+================================================================================
+
+OBJETIVO: Compensar degradación de sensores de bajo costo
+
+PROBLEMA:
+├─ Sensores Aire2, Aire4, Aire5 no son confiables
+├─ No se pueden usar como entrenamiento
+└─ Necesitamos modelo predictivo basado en referencia
+
+SOLUCIÓN:
+├─ Usar RMCAB como única fuente de verdad
+├─ RMCAB es estación oficial de Bogotá (confiable)
+├─ Entrenar LSTM con datos de RMCAB
+└─ Usar modelo para predecir futuro
+
+VENTAJAS:
+├─ Datos reales de estación confiable
+├─ No depende de sensores degradados
+├─ Modelo es reproducible
+└─ Resultados verificables
+
+================================================================================
+FLUJO DE DATOS REAL
+================================================================================
+
+Paso 1: Descargar RMCAB (una sola vez con Postman)
+   └─ POST a API RMCAB
+      └─ Guardar CSV en data_rmcab/rmcab_data.csv
+
+Paso 2: Cargar RMCAB CSV (cada vez que entrena)
+   └─ modules/data_processor.load_rmcab_from_csv()
+      └─ Lee data_rmcab/rmcab_data.csv
+         ├─ Extrae pm25_ref
+         ├─ Extrae pm10_ref
+         └─ (temperatura y rh vienen vacías o ignoradas)
+
+Paso 3: Simular Temperatura y Humedad
+   └─ modules/data_processor._simulate_environmental_data()
+      └─ Genera datos realistas basados en:
+         ├─ Patrón sinusoidal (ciclo diario)
+         ├─ Ruido gaussiano
+         └─ Rangos de Bogotá (18-24°C, 60-90% RH)
+
+Paso 4: Preparar datos para LSTM
+   └─ modules/predictive_model.TimeSeriesPreprocessor.prepare_data()
+      ├─ Normalizar [0, 1]
+      ├─ Crear secuencias 24h
+      ├─ Split 75% train / 25% test (temporal)
+      └─ Listo para LSTM
+
+Paso 5: Entrenar LSTM
+   └─ modules/predictive_model.LSTMPredictor
+      ├─ 2 capas LSTM (64, 32 neuronas)
+      ├─ 3 modelos independientes (1h, 3h, 5h)
+      └─ Usar solo datos RMCAB
+
+Paso 6: Predecir
+   └─ Generar predicciones para PM2.5 y PM10
+      ├─ 1 hora adelante
+      ├─ 3 horas adelante
+      └─ 5 horas adelante
+
+Paso 7: Evaluar
+   └─ Calcular 4 métricas:
+      ├─ RMSE
+      ├─ MAE
+      ├─ R²
+      └─ MAPE
+
+Paso 8: Reportar
+   └─ Generar:
+      ├─ CSV con métricas
+      ├─ Gráficos PNG
+      └─ Visualizaciones web
+
+================================================================================
+VERIFICACIÓN: ¿De dónde vienen los datos?
+================================================================================
+
+Para verificar que el modelo SOLO usa RMCAB:
+
+1. Abre app.py
+   └─ Busca /api/objetivo2/train-predictor
+      └─ Verás que carga:
+         └─ rmcab_df = processor.load_rmcab_from_csv()
+
+2. Abre train_predictor.py
+   └─ Busca main()
+      └─ Verás que carga:
+         └─ rmcab_df = data_processor.load_rmcab_from_csv()
+
+3. Abre modules/data_processor.py
+   └─ Busca load_rmcab_from_csv()
+      └─ Verás que lee:
+         └─ data_rmcab/rmcab_data.csv
+
+4. Abre modules/predictive_model.py
+   └─ Verás docstring que dice:
+      ├─ "USA SOLO datos reales de RMCAB"
+      ├─ "NO usa datos de PostgreSQL"
+      └─ "NO usa Aire2, Aire4, Aire5"
+
+================================================================================
+RESUMEN
+================================================================================
+
+✅ PM2.5 Real:        data_rmcab/rmcab_data.csv → pm25_ref
+✅ PM10 Real:         data_rmcab/rmcab_data.csv → pm10_ref
+✅ Temperatura Sim:   Generada → temperatura
+✅ Humedad Sim:       Generada → rh
+
+❌ PostgreSQL:        NO USADO
+❌ Aire2/4/5:         NO USADO
+❌ API Tiempo Real:   NO USADO (datos descargados)
+
+RESULTADO: Modelo entrenado SOLO con datos RMCAB verificados
+
+================================================================================
+Versión: 1.0
+Fecha: 2025-11-20
+================================================================================

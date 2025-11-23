@@ -1,629 +1,232 @@
 """
-Módulo para crear visualizaciones de datos de calidad del aire
+Módulo para generar visualizaciones interactivas con Plotly.
 """
-
-import plotly.graph_objects as go
-import plotly.express as px
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.express as px
+import base64
+import io
+import json
 
 
-# Colores del proyecto
-COLORS = {
-    'primary_green': '#2d5016',
-    'primary_green_light': '#4a7c2c',
-    'secondary_blue': '#0077b6',
-    'secondary_blue_light': '#00b4d8',
-    'accent_teal': '#14b8a6',
-    'accent_lime': '#84cc16'
-}
+class DataVisualizer:
+    """Clase para generar visualizaciones de datos"""
 
-# Límites normativos
-LIMITS = {
-    'pm25': {
-        'OMS_2021': 15,
-        'Colombia': 25
-    },
-    'pm10': {
-        'OMS_2021': 45,
-        'Colombia': 50
-    }
-}
+    @staticmethod
+    def plot_timeseries(df, title="Serie de Tiempo"):
+        """
+        Genera gráfico de serie de tiempo con sensores y RMCAB
 
+        Args:
+            df: DataFrame con datos
+            title: Título del gráfico
 
-def create_timeseries_plot(df, pollutant='pm25', title=None):
-    """
-    Crea gráfico de series de tiempo
-
-    Args:
-        df: DataFrame con columnas datetime y contaminante
-        pollutant: 'pm25' o 'pm10'
-        title: Título del gráfico (opcional)
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
-    if df is None or df.empty:
-        # Gráfico vacío
+        Returns:
+            JSON de Plotly
+        """
         fig = go.Figure()
-        fig.add_annotation(
-            text="No hay datos disponibles",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=20, color="gray")
+
+        # Agregar sensores
+        for sensor in ['Aire2', 'Aire4', 'Aire5']:
+            if sensor in df.columns:
+                fig.add_trace(go.Scatter(
+                    x=df['datetime'],
+                    y=df[sensor],
+                    mode='lines',
+                    name=sensor,
+                    line=dict(width=1.5),
+                    opacity=0.8
+                ))
+
+        # Agregar RMCAB
+        if 'PM25' in df.columns:
+            fig.add_trace(go.Scatter(
+                x=df['datetime'],
+                y=df['PM25'],
+                mode='lines',
+                name='RMCAB (Referencia)',
+                line=dict(color='black', width=2.5, dash='solid')
+            ))
+
+        fig.update_layout(
+            title=title,
+            xaxis_title='Fecha',
+            yaxis_title='PM2.5 (μg/m³)',
+            hovermode='x unified',
+            template='plotly_white',
+            height=400,
+            margin=dict(l=50, r=50, t=50, b=50)
         )
-        return fig
 
-    fig = go.Figure()
+        return fig.to_json()
 
-    # Si hay múltiples dispositivos/estaciones
-    if 'device_name' in df.columns:
-        for device in df['device_name'].unique():
-            device_data = df[df['device_name'] == device]
-            fig.add_trace(go.Scatter(
-                x=device_data['datetime'],
-                y=device_data[pollutant],
-                mode='lines',
-                name=device,
-                line=dict(width=2)
-            ))
-    elif 'station' in df.columns:
-        for station in df['station'].unique():
-            station_data = df[df['station'] == station]
-            fig.add_trace(go.Scatter(
-                x=station_data['datetime'],
-                y=station_data[pollutant],
-                mode='lines',
-                name=station,
-                line=dict(width=2)
-            ))
-    else:
+    @staticmethod
+    def plot_scatter(df, sensor_name, title=None):
+        """
+        Genera scatter plot: Sensor vs RMCAB
+
+        Args:
+            df: DataFrame con datos
+            sensor_name: Nombre del sensor
+            title: Título del gráfico
+
+        Returns:
+            JSON de Plotly
+        """
+        if title is None:
+            title = f'{sensor_name} vs RMCAB'
+
+        # Remover NaNs
+        clean_df = df[[sensor_name, 'PM25']].dropna()
+
+        if len(clean_df) == 0:
+            return None
+
+        # Crear scatter
+        fig = go.Figure()
+
         fig.add_trace(go.Scatter(
-            x=df['datetime'],
-            y=df[pollutant],
+            x=clean_df['PM25'],
+            y=clean_df[sensor_name],
+            mode='markers',
+            marker=dict(
+                size=6,
+                color=clean_df['PM25'],
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(title='RMCAB PM2.5')
+            ),
+            text=[f'RMCAB: {r:.1f}<br>{sensor_name}: {s:.1f}'
+                  for r, s in zip(clean_df['PM25'], clean_df[sensor_name])],
+            hovertemplate='<b>%{text}</b><extra></extra>',
+            name=sensor_name
+        ))
+
+        # Agregar línea diagonal (y=x)
+        min_val = min(clean_df['PM25'].min(), clean_df[sensor_name].min())
+        max_val = max(clean_df['PM25'].max(), clean_df[sensor_name].max())
+
+        fig.add_trace(go.Scatter(
+            x=[min_val, max_val],
+            y=[min_val, max_val],
             mode='lines',
-            name=pollutant.upper(),
-            line=dict(width=2, color=COLORS['primary_green'])
+            name='Línea Perfecta (y=x)',
+            line=dict(color='red', dash='dash', width=2)
         ))
 
-    # Agregar límites normativos
-    if pollutant in LIMITS:
-        # Límite OMS
-        fig.add_hline(
-            y=LIMITS[pollutant]['OMS_2021'],
-            line_dash="dash",
-            line_color="orange",
-            annotation_text="OMS 2021",
-            annotation_position="right"
+        fig.update_layout(
+            title=title,
+            xaxis_title='RMCAB PM2.5 (μg/m³)',
+            yaxis_title=f'{sensor_name} PM2.5 (μg/m³)',
+            hovermode='closest',
+            template='plotly_white',
+            height=400,
+            showlegend=True,
+            margin=dict(l=50, r=50, t=50, b=50)
         )
 
-        # Límite Colombia
-        fig.add_hline(
-            y=LIMITS[pollutant]['Colombia'],
-            line_dash="dash",
-            line_color="red",
-            annotation_text="Colombia",
-            annotation_position="right"
+        # Hacer que los ejes sean iguales
+        fig.update_xaxes(scaleanchor="y", scaleratio=1)
+        fig.update_yaxes(scaleanchor="x", scaleratio=1)
+
+        return fig.to_json()
+
+    @staticmethod
+    def plot_sensor_comparison(df, title="Comparación de Sensores Individuales"):
+        """
+        Genera gráficos individuales de cada sensor vs RMCAB
+
+        Args:
+            df: DataFrame con datos
+            title: Título general
+
+        Returns:
+            dict con gráficos JSON
+        """
+        graphs = {}
+        sensors = ['Aire2', 'Aire4', 'Aire5']
+
+        for sensor in sensors:
+            if sensor in df.columns:
+                graph_json = DataVisualizer.plot_scatter(df, sensor, f'{sensor} vs RMCAB')
+                if graph_json:
+                    graphs[sensor] = graph_json
+
+        return graphs
+
+    @staticmethod
+    def create_metrics_table(results):
+        """
+        Crea tabla HTML con resultados de calibración
+
+        Args:
+            results: dict con resultados de calibración
+
+        Returns:
+            HTML string
+        """
+        html = '<div class="table-responsive"><table class="table table-sm table-hover">'
+        html += '<thead class="table-light"><tr>'
+        html += '<th>Sensor</th><th>Modelo</th><th>R²</th><th>RMSE</th><th>MAE</th><th>MAPE (%)</th>'
+        html += '</tr></thead><tbody>'
+
+        for sensor, models in results.items():
+            if models is None:
+                continue
+
+            first_row = True
+            for model_name, metrics in models.items():
+                if metrics.get('error'):
+                    continue
+
+                row_class = 'table-light' if first_row else ''
+                html += f'<tr class="{row_class}">'
+
+                if first_row:
+                    html += f'<td rowspan="{len([m for m in models.items() if not m[1].get("error")])}">'
+                    html += f'<strong>{sensor}</strong></td>'
+                    first_row = False
+
+                html += f'<td>{model_name}</td>'
+                html += f'<td>{metrics.get("r2", "-")}</td>'
+                html += f'<td>{metrics.get("rmse", "-")}</td>'
+                html += f'<td>{metrics.get("mae", "-")}</td>'
+                html += f'<td>{metrics.get("mape", "-")}</td>'
+                html += '</tr>'
+
+        html += '</tbody></table></div>'
+        return html
+
+    @staticmethod
+    def create_degradation_summary(degradation_data):
+        """
+        Crea resumen visual de degradación
+
+        Args:
+            degradation_data: dict con datos de degradación
+
+        Returns:
+            JSON de gráfico Plotly
+        """
+        sensors = list(degradation_data.keys())
+        raw_r2 = [degradation_data[s]['raw_r2'] for s in sensors]
+        cal_r2 = [degradation_data[s]['calibrated_r2'] for s in sensors]
+
+        fig = go.Figure(data=[
+            go.Bar(name='R² Crudo (Sin Calibración)', x=sensors, y=raw_r2),
+            go.Bar(name='R² Calibrado', x=sensors, y=cal_r2)
+        ])
+
+        fig.update_layout(
+            title='Mejora con Calibración',
+            barmode='group',
+            xaxis_title='Sensor',
+            yaxis_title='R² Score',
+            template='plotly_white',
+            height=350,
+            margin=dict(l=50, r=50, t=50, b=50)
         )
 
-    # Layout
-    if not title:
-        title = f"Serie de Tiempo - {pollutant.upper()}"
-
-    fig.update_layout(
-        title=title,
-        xaxis_title="Fecha y Hora",
-        yaxis_title=f"Concentración (µg/m³)",
-        hovermode='x unified',
-        template='plotly_white',
-        height=500,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
-    )
-
-    return fig
-
-
-def create_boxplot(df, pollutant='pm25', title=None):
-    """
-    Crea diagrama de caja
-
-    Args:
-        df: DataFrame con datos
-        pollutant: 'pm25' o 'pm10'
-        title: Título del gráfico (opcional)
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
-    if df is None or df.empty:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No hay datos disponibles",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=20, color="gray")
-        )
-        return fig
-
-    fig = go.Figure()
-
-    # Agrupar por dispositivo/estación
-    if 'device_name' in df.columns:
-        group_col = 'device_name'
-    elif 'station' in df.columns:
-        group_col = 'station'
-    else:
-        group_col = None
-
-    if group_col:
-        for group in df[group_col].unique():
-            group_data = df[df[group_col] == group]
-            fig.add_trace(go.Box(
-                y=group_data[pollutant],
-                name=group,
-                boxmean='sd'
-            ))
-    else:
-        fig.add_trace(go.Box(
-            y=df[pollutant],
-            name=pollutant.upper(),
-            boxmean='sd'
-        ))
-
-    # Agregar límites normativos
-    if pollutant in LIMITS:
-        fig.add_hline(
-            y=LIMITS[pollutant]['OMS_2021'],
-            line_dash="dash",
-            line_color="orange",
-            annotation_text="OMS 2021"
-        )
-        fig.add_hline(
-            y=LIMITS[pollutant]['Colombia'],
-            line_dash="dash",
-            line_color="red",
-            annotation_text="Colombia"
-        )
-
-    if not title:
-        title = f"Distribución de {pollutant.upper()}"
-
-    fig.update_layout(
-        title=title,
-        yaxis_title=f"Concentración (µg/m³)",
-        template='plotly_white',
-        height=500
-    )
-
-    return fig
-
-
-def create_heatmap(df, pollutant='pm25', title=None):
-    """
-    Crea mapa de calor por hora del día
-
-    Args:
-        df: DataFrame con columna datetime
-        pollutant: 'pm25' o 'pm10'
-        title: Título del gráfico (opcional)
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
-    if df is None or df.empty:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No hay datos disponibles",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=20, color="gray")
-        )
-        return fig
-
-    # Extraer hora y día de la semana
-    df = df.copy()
-    df['hour'] = pd.to_datetime(df['datetime']).dt.hour
-    df['day_name'] = pd.to_datetime(df['datetime']).dt.day_name()
-
-    # Ordenar días de la semana
-    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    day_labels = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-
-    # Pivot table
-    pivot = df.pivot_table(
-        values=pollutant,
-        index='day_name',
-        columns='hour',
-        aggfunc='mean'
-    )
-
-    # Reordenar días
-    pivot = pivot.reindex(day_order)
-
-    # Crear heatmap
-    fig = go.Figure(data=go.Heatmap(
-        z=pivot.values,
-        x=list(range(24)),
-        y=day_labels,
-        colorscale='YlOrRd',
-        colorbar=dict(title="µg/m³")
-    ))
-
-    if not title:
-        title = f"Patrón Temporal - {pollutant.upper()} por Hora del Día"
-
-    fig.update_layout(
-        title=title,
-        xaxis_title="Hora del Día",
-        yaxis_title="Día de la Semana",
-        template='plotly_white',
-        height=500
-    )
-
-    return fig
-
-
-def create_scatter_plot(df, x_col, y_col, title=None):
-    """
-    Crea diagrama de dispersión
-
-    Args:
-        df: DataFrame
-        x_col: Columna para eje X
-        y_col: Columna para eje Y
-        title: Título
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
-    if df is None or df.empty:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No hay datos disponibles",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=20, color="gray")
-        )
-        return fig
-
-    fig = px.scatter(
-        df,
-        x=x_col,
-        y=y_col,
-        trendline="ols",
-        template='plotly_white'
-    )
-
-    if not title:
-        title = f"{y_col} vs {x_col}"
-
-    fig.update_layout(
-        title=title,
-        height=500
-    )
-
-    return fig
-
-
-def create_comparison_plot(results_df):
-    """
-    Crea gráfico de comparación de modelos
-
-    Args:
-        results_df: DataFrame con resultados de modelos
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
-    if results_df is None or results_df.empty:
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No hay resultados disponibles",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=20, color="gray")
-        )
-        return fig
-
-    # Crear subplots para cada métrica
-    from plotly.subplots import make_subplots
-
-    fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=('R² (mayor es mejor)', 'RMSE (menor es mejor)',
-                       'MAE (menor es mejor)', 'MAPE % (menor es mejor)')
-    )
-
-    # R²
-    fig.add_trace(
-        go.Bar(x=results_df['model_name'], y=results_df['r2'],
-               marker_color=COLORS['primary_green'], name='R²'),
-        row=1, col=1
-    )
-
-    # RMSE
-    fig.add_trace(
-        go.Bar(x=results_df['model_name'], y=results_df['rmse'],
-               marker_color=COLORS['secondary_blue'], name='RMSE'),
-        row=1, col=2
-    )
-
-    # MAE
-    fig.add_trace(
-        go.Bar(x=results_df['model_name'], y=results_df['mae'],
-               marker_color=COLORS['accent_teal'], name='MAE'),
-        row=2, col=1
-    )
-
-    # MAPE
-    fig.add_trace(
-        go.Bar(x=results_df['model_name'], y=results_df['mape'],
-               marker_color=COLORS['accent_lime'], name='MAPE'),
-        row=2, col=2
-    )
-
-    fig.update_layout(
-        title_text="Comparación de Modelos de Calibración",
-        showlegend=False,
-        height=700,
-        template='plotly_white'
-    )
-
-    return fig
-
-
-def create_calibration_scatter(y_true, y_pred, model_name, pollutant='PM2.5'):
-    """
-    Crea scatter plot de calibración (real vs predicho)
-
-    Args:
-        y_true: Valores reales
-        y_pred: Valores predichos
-        model_name: Nombre del modelo
-        pollutant: Nombre del contaminante
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
-    fig = go.Figure()
-
-    # Scatter plot
-    fig.add_trace(go.Scatter(
-        x=y_true,
-        y=y_pred,
-        mode='markers',
-        name='Predicciones',
-        marker=dict(
-            color=COLORS['primary_green'],
-            size=6,
-            opacity=0.6
-        ),
-        text=[f'Real: {r:.2f}<br>Pred: {p:.2f}' for r, p in zip(y_true, y_pred)],
-        hovertemplate='%{text}<extra></extra>'
-    ))
-
-    # Línea perfecta (y = x)
-    min_val = min(min(y_true), min(y_pred))
-    max_val = max(max(y_true), max(y_pred))
-
-    fig.add_trace(go.Scatter(
-        x=[min_val, max_val],
-        y=[min_val, max_val],
-        mode='lines',
-        name='Predicción Perfecta',
-        line=dict(color='red', dash='dash', width=2)
-    ))
-
-    # Calcular R²
-    from sklearn.metrics import r2_score
-    r2 = r2_score(y_true, y_pred)
-
-    fig.update_layout(
-        title=f'{model_name} - {pollutant}<br><sub>R² = {r2:.4f}</sub>',
-        xaxis_title=f'{pollutant} Real (µg/m³)',
-        yaxis_title=f'{pollutant} Predicho (µg/m³)',
-        template='plotly_white',
-        height=500,
-        showlegend=True
-    )
-
-    # Hacer cuadrado el gráfico
-    fig.update_xaxes(scaleanchor="y", scaleratio=1)
-
-    return fig
-
-
-def create_residuals_plot(y_true, y_pred, model_name):
-    """
-    Crea gráfico de residuales
-
-    Args:
-        y_true: Valores reales
-        y_pred: Valores predichos
-        model_name: Nombre del modelo
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
-    residuals = y_true - y_pred
-
-    fig = go.Figure()
-
-    fig.add_trace(go.Scatter(
-        x=y_pred,
-        y=residuals,
-        mode='markers',
-        name='Residuales',
-        marker=dict(
-            color=COLORS['secondary_blue'],
-            size=6,
-            opacity=0.6
-        )
-    ))
-
-    # Línea en cero
-    fig.add_hline(y=0, line_dash="dash", line_color="red")
-
-    fig.update_layout(
-        title=f'Residuales - {model_name}',
-        xaxis_title='Valores Predichos (µg/m³)',
-        yaxis_title='Residuales (µg/m³)',
-        template='plotly_white',
-        height=400
-    )
-
-    return fig
-
-
-def create_before_after_comparison(df_original, df_calibrated, device_name, pollutant='pm25'):
-    """
-    Crea comparación antes/después de calibración
-
-    Args:
-        df_original: DataFrame con datos originales
-        df_calibrated: DataFrame con datos calibrados
-        device_name: Nombre del dispositivo
-        pollutant: Contaminante
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
-    fig = go.Figure()
-
-    # Datos originales
-    fig.add_trace(go.Scatter(
-        x=df_original['datetime'],
-        y=df_original[f'{pollutant}_sensor'],
-        mode='lines',
-        name=f'{device_name} - Sin Calibrar',
-        line=dict(color='gray', width=1),
-        opacity=0.7
-    ))
-
-    # Datos calibrados
-    fig.add_trace(go.Scatter(
-        x=df_calibrated['datetime'],
-        y=df_calibrated[f'{pollutant}_calibrated'],
-        mode='lines',
-        name=f'{device_name} - Calibrado',
-        line=dict(color=COLORS['primary_green'], width=2)
-    ))
-
-    # Datos de referencia
-    fig.add_trace(go.Scatter(
-        x=df_calibrated['datetime'],
-        y=df_calibrated[f'{pollutant}_ref'],
-        mode='lines',
-        name='RMCAB (Referencia)',
-        line=dict(color='red', width=1.5, dash='dot')
-    ))
-
-    # Límites normativos
-    if pollutant in LIMITS:
-        fig.add_hline(
-            y=LIMITS[pollutant]['OMS_2021'],
-            line_dash="dash",
-            line_color="orange",
-            annotation_text="OMS 2021",
-            annotation_position="right"
-        )
-
-    fig.update_layout(
-        title=f'Comparación Antes/Después - {device_name}',
-        xaxis_title='Fecha y Hora',
-        yaxis_title=f'Concentración {pollutant.upper()} (µg/m³)',
-        hovermode='x unified',
-        template='plotly_white',
-        height=500,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
-    )
-
-    return fig
-
-
-def create_model_effectiveness_summary(results_list):
-    """
-    Crea resumen visual de efectividad de modelos
-
-    Args:
-        results_list: Lista de resultados de calibración
-
-    Returns:
-        plotly.graph_objects.Figure
-    """
-    from plotly.subplots import make_subplots
-
-    # Convertir a DataFrame
-    df = pd.DataFrame(results_list)
-
-    fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=(
-            'R² por Modelo (↑ mejor)',
-            'RMSE por Modelo (↓ mejor)',
-            'MAE por Modelo (↓ mejor)',
-            'MAPE por Modelo (↓ mejor)'
-        ),
-        specs=[[{"type": "bar"}, {"type": "bar"}],
-               [{"type": "bar"}, {"type": "bar"}]]
-    )
-
-    # Colores por modelo
-    colors = [COLORS['primary_green'], COLORS['secondary_blue'], COLORS['accent_teal'],
-              '#fbbf24', '#f87171']
-
-    # R²
-    fig.add_trace(
-        go.Bar(x=df['model_name'], y=df['r2'], marker_color=colors, name='R²',
-               text=df['r2'].round(4), textposition='outside'),
-        row=1, col=1
-    )
-
-    # RMSE
-    fig.add_trace(
-        go.Bar(x=df['model_name'], y=df['rmse'], marker_color=colors, name='RMSE',
-               text=df['rmse'].round(2), textposition='outside'),
-        row=1, col=2
-    )
-
-    # MAE
-    fig.add_trace(
-        go.Bar(x=df['model_name'], y=df['mae'], marker_color=colors, name='MAE',
-               text=df['mae'].round(2), textposition='outside'),
-        row=2, col=1
-    )
-
-    # MAPE
-    fig.add_trace(
-        go.Bar(x=df['model_name'], y=df['mape'], marker_color=colors, name='MAPE',
-               text=df['mape'].round(2), textposition='outside'),
-        row=2, col=2
-    )
-
-    fig.update_layout(
-        title_text="Efectividad de Modelos de Calibración",
-        showlegend=False,
-        height=800,
-        template='plotly_white'
-    )
-
-    # Actualizar ejes
-    fig.update_xaxes(tickangle=-45)
-
-    return fig
-
-
-if __name__ == '__main__':
-    print("Módulo de visualización cargado correctamente")
+        return fig.to_json()

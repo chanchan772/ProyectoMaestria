@@ -1,516 +1,416 @@
 {% extends "base.html" %}
 
-{% block title %}Definiciones Técnicas{% endblock %}
-
 {% block content %}
-<!-- Hero Section -->
-<section class="hero" style="padding: 3rem 0;">
+<section class="section fade-in">
     <div class="container">
-        <h1>
-            <i class="bi bi-book-fill"></i>
-            Glosario Técnico
-        </h1>
-        <p class="lead">
-            Definiciones, conceptos y estándares de calidad del aire
-        </p>
-    </div>
-</section>
+        <div class="row text-center mb-5">
+            <div class="col-md-10 mx-auto">
+                <h2 class="section-title">Glosario Técnico y Conceptos Clave</h2>
+                <p class="section-subtitle">
+                    Una guía completa de los términos técnicos, conceptos de calidad del aire, métricas de evaluación de modelos y estándares normativos utilizados en este proyecto.
+                </p>
+            </div>
+        </div>
 
-<!-- Material Particulado -->
-<section class="section">
-    <div class="container">
-        <h2 class="section-title">
-            <i class="bi bi-wind"></i>
-            Material Particulado (PM)
-        </h2>
+        <!-- SECCIÓN 1: Contaminantes y Calidad del Aire -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <h4 class="text-success mb-3">🌍 Contaminantes del Aire y Calidad</h4>
+            </div>
+        </div>
+        <div class="row g-4 mb-5">
+            <div class="col-md-6">
+                <div class="card h-100 border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">PM10 (Material Particulado 10 μm)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Partículas sólidas o líquidas suspendidas en el aire con diámetro aerodinámico de 10 micrómetros o menos.</p>
+                        <h6 class="fw-bold small mt-3">Fuentes Comunes:</h6>
+                        <ul class="small">
+                            <li>• Polvo del suelo y carreteras</li>
+                            <li>• Construcción y demolición</li>
+                            <li>• Tráfico vehicular</li>
+                            <li>• Actividades industriales</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">Impacto en Salud:</h6>
+                        <p class="small">Se deposita en las vías respiratorias superiores (nariz, garganta, tráquea). Puede provocar irritación, tos y problemas respiratorios, especialmente en niños, adultos mayores y personas con enfermedades respiratorias.</p>
+                        <p class="small text-muted mt-2"><strong>Norma OMS 2021:</strong> 15 μg/m³ (promedio 24 horas)</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">PM2.5 (Material Particulado Fine 2.5 μm)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Partículas muy finas con diámetro aerodinámico de 2.5 micrómetros o menos. Son las más peligrosas para la salud.</p>
+                        <h6 class="fw-bold small mt-3">Fuentes Comunes:</h6>
+                        <ul class="small">
+                            <li>• Combustión de combustibles fósiles</li>
+                            <li>• Emisiones vehiculares</li>
+                            <li>• Procesos industriales</li>
+                            <li>• Incendios y quema de biomasa</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">Impacto en Salud:</h6>
+                        <p class="small">Penetra profundamente en los pulmones (alvéolos) e incluso puede entrar al torrente sanguíneo. Asociado con enfermedades cardiovasculares, respiratorias crónicas, cáncer de pulmón y muerte prematura.</p>
+                        <p class="small text-muted mt-2"><strong>Norma OMS 2021:</strong> 5 μg/m³ (promedio 24 horas)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <!-- SECCIÓN 2: Conceptos de Monitoreo -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <h4 class="text-primary mb-3">📊 Monitoreo y Sensores</h4>
+            </div>
+        </div>
+        <div class="row g-4 mb-5">
+            <div class="col-md-6">
+                <div class="card h-100 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Sensor de Bajo Costo</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Dispositivo económico y portátil que mide concentraciones de contaminantes atmosféricos como PM2.5 y PM10.</p>
+                        <h6 class="fw-bold small mt-3">Características:</h6>
+                        <ul class="small">
+                            <li>• Precio accesible (50-500 USD)</li>
+                            <li>• Portátil y fácil de instalar</li>
+                            <li>• Bajo consumo de energía</li>
+                            <li>• Tecnología óptica o gravimétrica</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">Limitaciones:</h6>
+                        <ul class="small">
+                            <li>✗ Menos precisión que equipos profesionales</li>
+                            <li>✗ Sensibles a humedad y temperatura</li>
+                            <li>✗ Requieren calibración periódica</li>
+                            <li>✗ Pueden tener deriva en el tiempo</li>
+                        </ul>
+                        <p class="small text-success mt-2"><strong>Solución:</strong> Calibración mediante Machine Learning</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Estación de Referencia (RMCAB)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Red de Monitoreo de Calidad del Aire de Bogotá - Sistema oficial de monitoreo con estaciones equipadas con instrumentos de alta precisión.</p>
+                        <h6 class="fw-bold small mt-3">Características:</h6>
+                        <ul class="small">
+                            <li>• Equipos de alta precisión (FEM/BAM)</li>
+                            <li>• Calibración regular y mantenimiento</li>
+                            <li>• Cobertura estratégica en Bogotá</li>
+                            <li>• Datos confiables ("oro estándar")</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">Ventajas:</h6>
+                        <ul class="small">
+                            <li>✓ Máxima precisión y confiabilidad</li>
+                            <li>✓ Trazabilidad internacional</li>
+                            <li>✓ Mantenimiento profesional</li>
+                            <li>✓ Datos públicos y accesibles</li>
+                        </ul>
+                        <p class="small text-primary mt-2"><strong>Rol:</strong> Datos de referencia para calibración</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 3: Conceptos de Machine Learning -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <h4 class="text-info mb-3">🤖 Machine Learning y Calibración</h4>
+            </div>
+        </div>
+        <div class="row g-4 mb-5">
+            <div class="col-md-6">
+                <div class="card h-100 border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Machine Learning (Aprendizaje Automático)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Campo de la inteligencia artificial donde sistemas computacionales aprenden patrones de datos sin ser programados explícitamente.</p>
+                        <h6 class="fw-bold small mt-3">Proceso de Aprendizaje:</h6>
+                        <ol class="small">
+                            <li>Recopilación de datos de entrenamiento</li>
+                            <li>Identificación de patrones y relaciones</li>
+                            <li>Ajuste de parámetros del modelo</li>
+                            <li>Evaluación con datos de prueba</li>
+                            <li>Predicción en datos nuevos</li>
+                        </ol>
+                        <h6 class="fw-bold small mt-3">Ventajas para Calibración:</h6>
+                        <ul class="small">
+                            <li>✓ Adapta modelos a datos locales</li>
+                            <li>✓ Captura relaciones complejas</li>
+                            <li>✓ Mejora continua posible</li>
+                            <li>✓ Automatiza ajustes</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Modelo de Regresión</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Tipo de modelo supervisado que predice un valor numérico continuo basándose en variables de entrada (features).</p>
+                        <h6 class="fw-bold small mt-3">Fórmula General:</h6>
+                        <p class="small text-monospace bg-light p-2">PM2.5_calibrado = f(PM2.5_sensor, Humedad, Temperatura)</p>
+                        <h6 class="fw-bold small mt-3">En Este Proyecto:</h6>
+                        <ul class="small">
+                            <li><strong>Variables de Entrada:</strong> PM2.5 del sensor, RH%, Temperatura</li>
+                            <li><strong>Variable Objetivo:</strong> PM2.5 de referencia RMCAB</li>
+                            <li><strong>Salida:</strong> PM2.5 calibrado predicho</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">Algoritmos Utilizados:</h6>
+                        <ul class="small">
+                            <li>• Linear Regression</li>
+                            <li>• Random Forest</li>
+                            <li>• Gradient Boosting</li>
+                            <li>• Support Vector Regression</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Calibración de Sensores</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Proceso de ajustar las mediciones de un instrumento para que coincidan con valores de referencia confiables.</p>
+                        <h6 class="fw-bold small mt-3">Proceso en Este Proyecto:</h6>
+                        <ol class="small">
+                            <li>Colectar datos simultáneos: sensor + RMCAB</li>
+                            <li>Entrenar modelo ML con pares de datos</li>
+                            <li>Evaluar precisión con datos nuevos</li>
+                            <li>Seleccionar mejor modelo</li>
+                            <li>Aplicar a nuevas predicciones</li>
+                        </ol>
+                        <h6 class="fw-bold small mt-3">Beneficio:</h6>
+                        <p class="small">Transforma mediciones inexactas en datos confiables sin necesidad de calibración manual periódica del hardware.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Train/Test Split</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> División de datos en dos conjuntos: entrenamiento (para aprender) y prueba (para evaluar).</p>
+                        <h6 class="fw-bold small mt-3">En Este Proyecto:</h6>
+                        <ul class="small">
+                            <li><strong>Datos de Entrenamiento:</strong> 75% del total</li>
+                            <li><strong>Datos de Prueba:</strong> 25% del total</li>
+                            <li><strong>Aleatorización:</strong> random_state=42</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">¿Por Qué?</h6>
+                        <ul class="small">
+                            <li>✓ Evita sobreajuste (overfitting)</li>
+                            <li>✓ Evalúa con datos no vistos</li>
+                            <li>✓ Estima desempeño real</li>
+                            <li>✓ Reproducible con seed fijo</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 4: Métricas de Evaluación -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <h4 class="text-warning mb-3">📈 Métricas de Evaluación de Modelos</h4>
+            </div>
+        </div>
+        <div class="row g-4 mb-5">
+            <div class="col-md-6">
+                <div class="card h-100 border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">RMSE (Root Mean Square Error)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Raíz del promedio de los cuadrados de los errores. Mide qué tan alejadas están las predicciones del valor real.</p>
+                        <p class="small text-monospace bg-light p-2">RMSE = √(Σ(y_real - y_pred)² / n)</p>
+                        <h6 class="fw-bold small mt-3">Interpretación:</h6>
+                        <ul class="small">
+                            <li>• <strong>Unidades:</strong> Mismas que la variable objetivo (μg/m³)</li>
+                            <li>• <strong>Rango:</strong> 0 a infinito (menor es mejor)</li>
+                            <li>• <strong>Penaliza:</strong> Errores grandes más fuertemente</li>
+                        </ul>
+                        <p class="small text-success mt-2"><strong>Uso en Proyecto:</strong> Métrica principal para seleccionar el mejor modelo</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">MAE (Mean Absolute Error)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Promedio del valor absoluto de los errores. Error promedio sin penalizar mucho los errores grandes.</p>
+                        <p class="small text-monospace bg-light p-2">MAE = Σ|y_real - y_pred| / n</p>
+                        <h6 class="fw-bold small mt-3">Interpretación:</h6>
+                        <ul class="small">
+                            <li>• <strong>Unidades:</strong> Mismas que la variable (μg/m³)</li>
+                            <li>• <strong>Rango:</strong> 0 a infinito (menor es mejor)</li>
+                            <li>• <strong>Ventaja:</strong> Más interpretable que RMSE</li>
+                        </ul>
+                        <p class="small text-muted mt-2"><em>Nota:</em> El MAE de nuestro mejor modelo representa el error promedio esperado en predicciones</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">R² Score (Coeficiente de Determinación)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Proporción de varianza explicada por el modelo. Indica qué tan bien el modelo explica la variabilidad en los datos.</p>
+                        <p class="small text-monospace bg-light p-2">R² = 1 - (SS_res / SS_tot)</p>
+                        <h6 class="fw-bold small mt-3">Interpretación:</h6>
+                        <ul class="small">
+                            <li>• <strong>Rango:</strong> 0 a 1 (mayor es mejor)</li>
+                            <li>• <strong>0.9+:</strong> Excelente ajuste</li>
+                            <li>• <strong>0.7-0.9:</strong> Buen ajuste</li>
+                            <li>• <strong>&lt;0.5:</strong> Modelo pobre</li>
+                        </ul>
+                        <p class="small text-success mt-2"><strong>Ejemplo:</strong> R² = 0.85 significa que el modelo explica 85% de la variabilidad</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">MAPE (Mean Absolute Percentage Error)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Promedio del error porcentual absoluto. Expresado como porcentaje, fácil de comunicar.</p>
+                        <p class="small text-monospace bg-light p-2">MAPE = (100/n) × Σ|y_real - y_pred| / y_real</p>
+                        <h6 class="fw-bold small mt-3">Interpretación:</h6>
+                        <ul class="small">
+                            <li>• <strong>Unidades:</strong> Porcentaje (%)</li>
+                            <li>• <strong>Rango:</strong> 0 a infinito (menor es mejor)</li>
+                            <li>• <strong>&lt;10%:</strong> Excelente</li>
+                            <li>• <strong>10-20%:</strong> Muy bueno</li>
+                        </ul>
+                        <p class="small text-muted mt-2"><strong>Ventaja:</strong> Fácil de explicar en términos porcentuales</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 5: Variables Predictoras -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <h4 class="text-secondary mb-3">🌡️ Variables del Modelo</h4>
+            </div>
+        </div>
+        <div class="row g-4 mb-5">
+            <div class="col-md-6">
+                <div class="card h-100 border-secondary">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">Humedad Relativa (RH)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Porcentaje de vapor de agua presente en el aire relativo a la cantidad máxima que el aire puede contener a esa temperatura.</p>
+                        <h6 class="fw-bold small mt-3">Rango:</h6>
+                        <p class="small">0% (aire seco) a 100% (saturado)</p>
+                        <h6 class="fw-bold small mt-3">Impacto en Sensores PM:</h6>
+                        <ul class="small">
+                            <li>• Humedad alta: Partículas se hinchan, sensores sobreestiman</li>
+                            <li>• Humedad baja: Mediciones más precisas</li>
+                            <li>• Variación: Causa de error importante en sensores</li>
+                        </ul>
+                        <p class="small text-info mt-2"><strong>En Modelo:</strong> Feature importante para corrección de mediciones</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-secondary">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">Temperatura (T)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small"><strong>Definición:</strong> Medida de la energía cinética promedio de las moléculas de aire. Expresada en grados Celsius (°C).</p>
+                        <h6 class="fw-bold small mt-3">Rango en Bogotá:</h6>
+                        <p class="small">Típicamente: 8-22°C (varía por altitud y hora del día)</p>
+                        <h6 class="fw-bold small mt-3">Impacto en Sensores PM:</h6>
+                        <ul class="small">
+                            <li>• Temperatura extrema: Afecta componentes electrónicos</li>
+                            <li>• Cambios rápidos: Pueden introducir ruido</li>
+                            <li>• Correlación: Con humedad (covaría en el tiempo)</li>
+                        </ul>
+                        <p class="small text-info mt-2"><strong>En Modelo:</strong> Variable ambiental de corrección</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 6: Estándares y Normativa -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <h4 class="text-danger mb-3">⚖️ Estándares y Límites Normativos</h4>
+            </div>
+        </div>
         <div class="row g-4">
-            <div class="col-lg-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header-custom">
-                        PM2.5 - Partículas Finas
+            <div class="col-12">
+                <div class="card border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">Límites Internacionales para PM2.5 (promedio 24 horas)</h5>
                     </div>
                     <div class="card-body">
-                        <h5 class="mb-3">¿Qué es PM2.5?</h5>
-                        <p>
-                            Material particulado con diámetro aerodinámico <strong>≤ 2.5 micrómetros (µm)</strong>. Son partículas tan pequeñas que pueden penetrar profundamente en los pulmones y el torrente sanguíneo.
-                        </p>
-                        <h6>Fuentes principales:</h6>
-                        <ul>
-                            <li>Combustión de vehículos (diesel y gasolina)</li>
-                            <li>Emisiones industriales</li>
-                            <li>Quema de biomasa</li>
-                            <li>Reacciones atmosféricas (PM2.5 secundario)</li>
-                        </ul>
-                        <h6>Efectos en la salud:</h6>
-                        <ul class="text-danger">
-                            <li>Enfermedades cardiovasculares</li>
-                            <li>Enfermedades respiratorias (asma, EPOC)</li>
-                            <li>Reducción de función pulmonar</li>
-                            <li>Mortalidad prematura</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header-custom card-header-blue">
-                        PM10 - Partículas Gruesas
-                    </div>
-                    <div class="card-body">
-                        <h5 class="mb-3">¿Qué es PM10?</h5>
-                        <p>
-                            Material particulado con diámetro aerodinámico <strong>≤ 10 micrómetros (µm)</strong>. Incluye partículas más grandes que pueden quedar atrapadas en las vías respiratorias superiores.
-                        </p>
-                        <h6>Fuentes principales:</h6>
-                        <ul>
-                            <li>Polvo de carreteras y construcción</li>
-                            <li>Procesos industriales</li>
-                            <li>Actividades agrícolas</li>
-                            <li>Erosión del suelo</li>
-                        </ul>
-                        <h6>Efectos en la salud:</h6>
-                        <ul class="text-danger">
-                            <li>Irritación de vías respiratorias</li>
-                            <li>Agravamiento de asma y bronquitis</li>
-                            <li>Tos y dificultad para respirar</li>
-                            <li>Reducción de capacidad pulmonar</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Índices de Calidad del Aire -->
-<section class="section bg-light">
-    <div class="container">
-        <h2 class="section-title text-center mb-5">
-            <i class="bi bi-speedometer2"></i>
-            Índices de Calidad del Aire (ICA)
-        </h2>
-
-        <!-- ICA - Colombia -->
-        <div class="card shadow-custom border-0 mb-4">
-            <div class="card-body p-4">
-                <h3 class="mb-4">
-                    <img src="https://flagcdn.com/w40/co.png" alt="Colombia" class="me-2">
-                    ICA Colombia (IDEAM)
-                </h3>
-                <p class="lead">
-                    El Índice de Calidad del Aire en Colombia está definido por el IDEAM y clasifica la calidad del aire en 6 categorías.
-                </p>
-
-                <div class="table-responsive">
-                    <table class="table table-bordered">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Categoría</th>
-                                <th>ICA</th>
-                                <th>PM2.5 (µg/m³)</th>
-                                <th>PM10 (µg/m³)</th>
-                                <th>Color</th>
-                                <th>Significado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Buena</strong></td>
-                                <td>0-50</td>
-                                <td>0-12</td>
-                                <td>0-54</td>
-                                <td><span class="badge-aqi badge-good">Verde</span></td>
-                                <td>La calidad del aire es satisfactoria</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Aceptable</strong></td>
-                                <td>51-100</td>
-                                <td>12.1-37.5</td>
-                                <td>55-154</td>
-                                <td><span class="badge-aqi badge-moderate">Amarillo</span></td>
-                                <td>Calidad aceptable, riesgo moderado para grupos sensibles</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Dañina a grupos sensibles</strong></td>
-                                <td>101-150</td>
-                                <td>37.6-55.4</td>
-                                <td>155-254</td>
-                                <td><span class="badge-aqi badge-unhealthy-sensitive">Naranja</span></td>
-                                <td>Riesgo para niños, ancianos y personas con enfermedades</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Dañina</strong></td>
-                                <td>151-200</td>
-                                <td>55.5-150.4</td>
-                                <td>255-354</td>
-                                <td><span class="badge-aqi badge-unhealthy">Rojo</span></td>
-                                <td>Toda la población puede experimentar efectos adversos</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Muy dañina</strong></td>
-                                <td>201-300</td>
-                                <td>150.5-250.4</td>
-                                <td>355-424</td>
-                                <td><span class="badge-aqi badge-very-unhealthy">Púrpura</span></td>
-                                <td>Alerta sanitaria, toda la población en riesgo</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Peligrosa</strong></td>
-                                <td>301-500</td>
-                                <td>250.5+</td>
-                                <td>425+</td>
-                                <td><span class="badge-aqi badge-hazardous">Marrón</span></td>
-                                <td>Emergencia sanitaria, efectos serios en toda la población</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- AQI - Estados Unidos (EPA) -->
-        <div class="card shadow-custom border-0 mb-4">
-            <div class="card-body p-4">
-                <h3 class="mb-4">
-                    <img src="https://flagcdn.com/w40/us.png" alt="USA" class="me-2">
-                    AQI Estados Unidos (EPA)
-                </h3>
-                <p class="lead">
-                    Air Quality Index definido por la Environmental Protection Agency (EPA) de Estados Unidos.
-                </p>
-
-                <div class="table-responsive">
-                    <table class="table table-bordered">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Categoría</th>
-                                <th>AQI</th>
-                                <th>PM2.5 (µg/m³)</th>
-                                <th>PM10 (µg/m³)</th>
-                                <th>Color</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Good</strong></td>
-                                <td>0-50</td>
-                                <td>0-12.0</td>
-                                <td>0-54</td>
-                                <td><span class="badge-aqi badge-good">Verde</span></td>
-                            </tr>
-                            <tr>
-                                <td><strong>Moderate</strong></td>
-                                <td>51-100</td>
-                                <td>12.1-35.4</td>
-                                <td>55-154</td>
-                                <td><span class="badge-aqi badge-moderate">Amarillo</span></td>
-                            </tr>
-                            <tr>
-                                <td><strong>Unhealthy for Sensitive Groups</strong></td>
-                                <td>101-150</td>
-                                <td>35.5-55.4</td>
-                                <td>155-254</td>
-                                <td><span class="badge-aqi badge-unhealthy-sensitive">Naranja</span></td>
-                            </tr>
-                            <tr>
-                                <td><strong>Unhealthy</strong></td>
-                                <td>151-200</td>
-                                <td>55.5-150.4</td>
-                                <td>255-354</td>
-                                <td><span class="badge-aqi badge-unhealthy">Rojo</span></td>
-                            </tr>
-                            <tr>
-                                <td><strong>Very Unhealthy</strong></td>
-                                <td>201-300</td>
-                                <td>150.5-250.4</td>
-                                <td>355-424</td>
-                                <td><span class="badge-aqi badge-very-unhealthy">Púrpura</span></td>
-                            </tr>
-                            <tr>
-                                <td><strong>Hazardous</strong></td>
-                                <td>301-500</td>
-                                <td>250.5-500.4</td>
-                                <td>425-604</td>
-                                <td><span class="badge-aqi badge-hazardous">Marrón</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Guías OMS -->
-        <div class="card shadow-custom border-0 mb-4">
-            <div class="card-body p-4">
-                <h3 class="mb-4">
-                    <i class="bi bi-globe2"></i>
-                    Guías de Calidad del Aire - OMS (2021)
-                </h3>
-                <p class="lead">
-                    La Organización Mundial de la Salud (OMS) establece niveles de referencia basados en evidencia científica para proteger la salud pública.
-                </p>
-
-                <div class="table-responsive">
-                    <table class="table table-bordered">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Contaminante</th>
-                                <th>Tiempo de Exposición</th>
-                                <th>Nivel (µg/m³)</th>
-                                <th>Nivel Anterior (2005)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td rowspan="2"><strong>PM2.5</strong></td>
-                                <td>Promedio anual</td>
-                                <td class="bg-warning bg-opacity-10">5</td>
-                                <td>10</td>
-                            </tr>
-                            <tr>
-                                <td>24 horas</td>
-                                <td class="bg-warning bg-opacity-10">15</td>
-                                <td>25</td>
-                            </tr>
-                            <tr>
-                                <td rowspan="2"><strong>PM10</strong></td>
-                                <td>Promedio anual</td>
-                                <td class="bg-info bg-opacity-10">15</td>
-                                <td>20</td>
-                            </tr>
-                            <tr>
-                                <td>24 horas</td>
-                                <td class="bg-info bg-opacity-10">45</td>
-                                <td>50</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <p class="text-muted">
-                    <small>
-                        <i class="bi bi-info-circle"></i>
-                        Las guías de 2021 son significativamente más estrictas que las de 2005, reflejando nueva evidencia sobre impactos en salud a niveles más bajos.
-                    </small>
-                </p>
-            </div>
-        </div>
-
-        <!-- Europa (EEA) -->
-        <div class="card shadow-custom border-0">
-            <div class="card-body p-4">
-                <h3 class="mb-4">
-                    <img src="https://flagcdn.com/w40/eu.png" alt="EU" class="me-2">
-                    Estándares Europeos (EEA)
-                </h3>
-                <p class="lead">
-                    La Agencia Europea de Medio Ambiente (EEA) define límites para proteger la salud ciudadana.
-                </p>
-
-                <div class="table-responsive">
-                    <table class="table table-bordered">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Contaminante</th>
-                                <th>Tiempo de Exposición</th>
-                                <th>Valor Límite (µg/m³)</th>
-                                <th>Objetivo 2030</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>PM2.5</strong></td>
-                                <td>Promedio anual</td>
-                                <td>25 (actual)</td>
-                                <td>10</td>
-                            </tr>
-                            <tr>
-                                <td rowspan="2"><strong>PM10</strong></td>
-                                <td>Promedio anual</td>
-                                <td>40</td>
-                                <td>20</td>
-                            </tr>
-                            <tr>
-                                <td>24 horas</td>
-                                <td>50 (35 excedencias/año)</td>
-                                <td>45</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Métricas de Machine Learning -->
-<section class="section">
-    <div class="container">
-        <h2 class="section-title text-center mb-5">
-            <i class="bi bi-calculator-fill"></i>
-            Métricas de Evaluación de Modelos
-        </h2>
-
-        <div class="row g-4">
-            <div class="col-lg-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header-custom">
-                        R² (Coeficiente de Determinación)
-                    </div>
-                    <div class="card-body">
-                        <h5>Definición</h5>
-                        <p>
-                            Mide la proporción de la varianza en la variable dependiente que es predecible desde las variables independientes.
-                        </p>
-                        <div class="bg-light p-3 rounded mb-3">
-                            <code>
-                                R² = 1 - (SS_residual / SS_total)
-                            </code>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Estándar/País</th>
+                                        <th>Límite 24h (μg/m³)</th>
+                                        <th>Límite Anual (μg/m³)</th>
+                                        <th>Año</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>OMS (Guía 2021)</strong></td>
+                                        <td class="bg-warning">5</td>
+                                        <td>5</td>
+                                        <td>2021</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>EPA (USA)</strong></td>
+                                        <td>35</td>
+                                        <td>12</td>
+                                        <td>2024</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Colombia (Res. 2254/17)</strong></td>
+                                        <td>25</td>
+                                        <td>12</td>
+                                        <td>2017</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Unión Europea</strong></td>
+                                        <td>25</td>
+                                        <td>25</td>
+                                        <td>2008</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>China</strong></td>
+                                        <td>35</td>
+                                        <td>35</td>
+                                        <td>2016</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-                        <h6>Interpretación:</h6>
-                        <ul>
-                            <li><strong>R² = 1:</strong> Predicción perfecta</li>
-                            <li><strong>R² = 0.8-0.9:</strong> Muy buena predicción</li>
-                            <li><strong>R² = 0.6-0.8:</strong> Buena predicción</li>
-                            <li><strong>R² < 0.6:</strong> Predicción débil</li>
-                            <li><strong>R² < 0:</strong> Modelo peor que promedio simple</li>
-                        </ul>
+                        <p class="small text-muted mt-3"><strong>Nota:</strong> La OMS establece límites más estrictos basados en evidencia epidemiológica de salud pública.</p>
                     </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header-custom card-header-blue">
-                        RMSE (Root Mean Squared Error)
-                    </div>
-                    <div class="card-body">
-                        <h5>Definición</h5>
-                        <p>
-                            Raíz cuadrada del promedio de los errores al cuadrado. Penaliza más los errores grandes.
-                        </p>
-                        <div class="bg-light p-3 rounded mb-3">
-                            <code>
-                                RMSE = √(Σ(y_real - y_pred)² / n)
-                            </code>
-                        </div>
-                        <h6>Características:</h6>
-                        <ul>
-                            <li>Expresado en las mismas unidades que los datos (µg/m³)</li>
-                            <li>Sensible a outliers</li>
-                            <li>Valores más bajos = mejor modelo</li>
-                            <li>Se compara con la desviación estándar de los datos</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header-custom card-header-teal">
-                        MAE (Mean Absolute Error)
-                    </div>
-                    <div class="card-body">
-                        <h5>Definición</h5>
-                        <p>
-                            Promedio de los valores absolutos de los errores. Más interpretable y robusto que RMSE.
-                        </p>
-                        <div class="bg-light p-3 rounded mb-3">
-                            <code>
-                                MAE = Σ|y_real - y_pred| / n
-                            </code>
-                        </div>
-                        <h6>Características:</h6>
-                        <ul>
-                            <li>Fácil de interpretar: error promedio en µg/m³</li>
-                            <li>Menos sensible a outliers que RMSE</li>
-                            <li>Todos los errores pesan igual</li>
-                            <li>Útil para reportes a stakeholders</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="card h-100 shadow-sm">
-                    <div class="card-header-custom" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-                        MAPE (Mean Absolute Percentage Error)
-                    </div>
-                    <div class="card-body">
-                        <h5>Definición</h5>
-                        <p>
-                            Promedio de los errores porcentuales absolutos. Útil para comparar modelos con diferentes escalas.
-                        </p>
-                        <div class="bg-light p-3 rounded mb-3">
-                            <code>
-                                MAPE = (100/n) × Σ|(y_real - y_pred)/y_real|
-                            </code>
-                        </div>
-                        <h6>Características:</h6>
-                        <ul>
-                            <li>Expresado en porcentaje (%)</li>
-                            <li>Fácil de comunicar: "el modelo se equivoca X% en promedio"</li>
-                            <li>Problemas con valores reales cercanos a cero</li>
-                            <li>Independiente de la escala de medición</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Normativa Colombia -->
-<section class="section bg-light">
-    <div class="container">
-        <h2 class="section-title text-center mb-4">
-            <i class="bi bi-file-text-fill"></i>
-            Normativa Colombiana
-        </h2>
-
-        <div class="card shadow-custom border-0">
-            <div class="card-body p-4">
-                <h4 class="mb-3">Resolución 2254 de 2017 (MinAmbiente)</h4>
-                <p class="lead">
-                    Establece los niveles máximos permisibles de contaminantes en el aire ambiente.
-                </p>
-
-                <div class="table-responsive">
-                    <table class="table table-bordered">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Contaminante</th>
-                                <th>Tiempo de Exposición</th>
-                                <th>Nivel Máximo Permisible</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td rowspan="2"><strong>PM2.5</strong></td>
-                                <td>Promedio anual</td>
-                                <td>25 µg/m³</td>
-                            </tr>
-                            <tr>
-                                <td>24 horas</td>
-                                <td>50 µg/m³</td>
-                            </tr>
-                            <tr>
-                                <td rowspan="2"><strong>PM10</strong></td>
-                                <td>Promedio anual</td>
-                                <td>50 µg/m³</td>
-                            </tr>
-                            <tr>
-                                <td>24 horas</td>
-                                <td>100 µg/m³</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="alert alert-warning mt-3">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <strong>Nota:</strong> Estos niveles son menos estrictos que las guías de la OMS 2021, lo que representa un área de mejora para la política ambiental colombiana.
                 </div>
             </div>
         </div>

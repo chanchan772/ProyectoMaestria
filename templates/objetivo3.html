@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section fade-in">
+    <div class="container">
+        <div class="row text-center mb-5">
+            <div class="col-md-10 mx-auto">
+                <h2 class="section-title">Objetivo 3: Despliegue y Democratización</h2>
+                <p class="section-subtitle">
+                    Implementar la solución en un entorno de producción accesible públicamente, con documentación y código abiertos, promoviendo la réplica y mejora continua de la metodología por la comunidad científica.
+                </p>
+            </div>
+        </div>
+
+        <!-- Definición -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">Propósito Fundamental</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>
+                            Este objetivo busca convertir un proyecto académico en una <strong>solución robusta, documentada y desplegada</strong> que pueda ser utilizada por la comunidad y que siente precedente para futuras investigaciones en monitoreo ambiental de bajo costo.
+                        </p>
+                        <h6 class="fw-bold mt-3">Pilares del Objetivo:</h6>
+                        <ul>
+                            <li>🌐 <strong>Accesibilidad:</strong> Disponible públicamente sin barreras de acceso</li>
+                            <li>📖 <strong>Documentación:</strong> Código bien comentado y guías exhaustivas</li>
+                            <li>🔓 <strong>Open Source:</strong> Código fuente abierto bajo licencia permisiva</li>
+                            <li>🔬 <strong>Reproducibilidad:</strong> Pasos claros para replicar el proyecto</li>
+                            <li>🚀 <strong>Escalabilidad:</strong> Preparado para crecer y adaptarse a nuevos contextos</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estrategia de Deployment -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <h4 class="text-primary mb-3">🚀 Estrategia de Deployment</h4>
+            </div>
+        </div>
+        <div class="row g-4 mb-5">
+            <div class="col-md-6">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Infraestructura en la Nube</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="fw-bold small">Plataforma: Render</h6>
+                        <p class="small text-muted">Hosting en la nube moderno, escalable y fácil de usar</p>
+                        <h6 class="fw-bold small mt-3">Ventajas:</h6>
+                        <ul class="small">
+                            <li>✓ Deploy automático desde GitHub</li>
+                            <li>✓ HTTPS automático</li>
+                            <li>✓ Escalado automático</li>
+                            <li>✓ Variables de entorno seguras</li>
+                            <li>✓ Monitoreo y logs</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">Configuración:</h6>
+                        <ul class="small">
+                            <li>Build: pip install -r requirements.txt</li>
+                            <li>Run: gunicorn app:app</li>
+                            <li>Workers: Auto-scaled</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Gestión de Código Fuente</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="fw-bold small">Plataforma: GitHub</h6>
+                        <p class="small text-muted">Control de versiones y colaboración abierta</p>
+                        <h6 class="fw-bold small mt-3">Estructura:</h6>
+                        <ul class="small">
+                            <li>✓ Repositorio público (open source)</li>
+                            <li>✓ README completo con instrucciones</li>
+                            <li>✓ LICENSE (MIT o similar)</li>
+                            <li>✓ CONTRIBUTING.md para colaboradores</li>
+                            <li>✓ Issues y pull requests habilitados</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">Ramas:</h6>
+                        <ul class="small">
+                            <li>main: código en producción</li>
+                            <li>develop: desarrollo activo</li>
+                            <li>feature/*: nuevas características</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documentación -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <h4 class="text-info mb-3">📚 Documentación Exhaustiva</h4>
+            </div>
+        </div>
+        <div class="row g-4 mb-5">
+            <div class="col-md-6">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Documentación Técnica</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="fw-bold small">README.md</h6>
+                        <ul class="small">
+                            <li>✓ Descripción del proyecto</li>
+                            <li>✓ Requisitos del sistema</li>
+                            <li>✓ Instrucciones de instalación</li>
+                            <li>✓ Cómo ejecutar localmente</li>
+                            <li>✓ Estructura de directorios</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">INSTALL.md / SETUP.md</h6>
+                        <ul class="small">
+                            <li>✓ Pasos detallados de instalación</li>
+                            <li>✓ Configuración de dependencias</li>
+                            <li>✓ Base de datos setup</li>
+                            <li>✓ Variables de entorno</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Documentación de Usuarios</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="fw-bold small">Guías de Uso</h6>
+                        <ul class="small">
+                            <li>✓ Guía rápida de inicio</li>
+                            <li>✓ Tutoriales paso a paso</li>
+                            <li>✓ FAQs frecuentes</li>
+                            <li>✓ Troubleshooting</li>
+                        </ul>
+                        <h6 class="fw-bold small mt-3">Documentación API</h5>
+                        <ul class="small">
+                            <li>✓ Endpoints disponibles</li>
+                            <li>✓ Parámetros y respuestas</li>
+                            <li>✓ Códigos de error</li>
+                            <li>✓ Ejemplos de uso</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estrategia de Comunidad -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <h4 class="text-success mb-3">🤝 Estrategia de Comunidad y Extensibilidad</h4>
+            </div>
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold text-success">Facilitando Contribuciones</h6>
+                                <ul class="small">
+                                    <li>✓ Código limpio y modular</li>
+                                    <li>✓ Tests unitarios incluidos</li>
+                                    <li>✓ CONTRIBUTING.md con guías</li>
+                                    <li>✓ Issues etiquetadas para buenos primeros aportes</li>
+                                    <li>✓ Pull requests reviews automáticas</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="fw-bold text-success">Posibilidades de Extensión</h6>
+                                <ul class="small">
+                                    <li>✓ Módulos de nuevos modelos ML</li>
+                                    <li>✓ Integración con nuevas fuentes de datos</li>
+                                    <li>✓ Visualizaciones adicionales</li>
+                                    <li>✓ Soporte para otros contaminantes</li>
+                                    <li>✓ Reproducción en otros contextos geográficos</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sostenibilidad -->
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <h4 class="text-warning mb-3">♻️ Sostenibilidad a Largo Plazo</h4>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-warning h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">Mantenimiento</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="small">
+                            <li>✓ Actualización de dependencias</li>
+                            <li>✓ Corrección de bugs reportados</li>
+                            <li>✓ Monitoreo de Performance</li>
+                            <li>✓ Seguridad de datos</li>
+                            <li>✓ Backup periódicos</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-warning h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">Escalabilidad</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="small">
+                            <li>✓ Preparado para crecer</li>
+                            <li>✓ Arquitectura modular</li>
+                            <li>✓ Base de datos optimizada</li>
+                            <li>✓ Caché implementado</li>
+                            <li>✓ Soporte multi-dispositivo</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-warning h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">Evolución</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="small">
+                            <li>✓ Hoja de ruta clara</li>
+                            <li>✓ Mejoras planeadas</li>
+                            <li>✓ Roadmap público</li>
+                            <li>✓ Feedback de usuarios</li>
+                            <li>✓ Investigación continua</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Impacto Esperado -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">🌟 Impacto Esperado del Despliegue</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6 class="fw-bold">Educativo</h6>
+                                <ul class="small">
+                                    <li>✓ Referencia para estudiantes</li>
+                                    <li>✓ Estudio de casos reales</li>
+                                    <li>✓ Formación en ML aplicado</li>
+                                    <li>✓ Proyectos derivados</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="fw-bold">Científico</h6>
+                                <ul class="small">
+                                    <li>✓ Metodología publicable</li>
+                                    <li>✓ Reproducible por terceros</li>
+                                    <li>✓ Base para futuras investigaciones</li>
+                                    <li>✓ Colaboraciones interdisciplinarias</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="fw-bold">Social</h6>
+                                <ul class="small">
+                                    <li>✓ Datos ambientales públicos</li>
+                                    <li>✓ Conciencia ciudadana</li>
+                                    <li>✓ Empoderamiento comunitario</li>
+                                    <li>✓ Contribución a ODS</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

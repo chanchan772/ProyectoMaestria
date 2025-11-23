@@ -1,1207 +1,592 @@
-"""
-Aplicación Web - Monitoreo de Calidad del Aire
-Proyecto de Maestría en Analítica de Datos - Universidad Central
-"""
+# -*- coding: utf-8 -*-
+import sys
+import io
 
-from flask import Flask, render_template, request, jsonify, send_file
-import os
+# Configurar encoding UTF-8 para Windows
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+from flask import Flask, render_template, jsonify, request
+from modules.data_processor import DataProcessor
+from modules.calibration import SensorCalibrator
+from modules.visualization import DataVisualizer
+from modules.predictive_model import PredictiveModelPipeline
+from modules.advanced_predictive_model import AdvancedPredictiveModel
 from dotenv import load_dotenv
 import json
-import pandas as pd
-import numpy as np
-from datetime import datetime, date
-from io import BytesIO
+import os
 
 # Cargar variables de entorno
 load_dotenv()
 
-# Inicializar Flask
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Importar módulos personalizados
-from modules.data_loader import (
-    load_lowcost_data,
-    load_rmcab_data,
-    RMCAB_STATION_INFO,
-    find_dense_window,
-    align_lowcost_with_reference,
-    get_last_lowcost_query
-)
-from modules.calibration import (
-    get_calibration_models,
-    train_and_evaluate_models,
-    run_device_calibration,
-    load_calibration_model,
-    predict_with_saved_model,
-    run_stage2_calibration
-)
-from modules.visualization import create_timeseries_plot, create_boxplot, create_heatmap
-from modules.metrics import calculate_statistics
+# Instancias globales para procesar datos
+data_processor = None
+calibrator = None
+predictive_model = None
+advanced_model = None
 
-DEVICE_LABELS = {
-    'Aire2': 'Sensor Aire2',
-    'Aire4': 'Sensor Aire4',
-    'Aire5': 'Sensor Aire5'
-}
+def initialize_data():
+    """Inicializa datos REALES de PostgreSQL y CSV RMCAB cache - SIN API CALLS"""
+    global data_processor, calibrator
+    data_processor = DataProcessor()
+    calibrator = SensorCalibrator()
 
+    print("\n" + "="*70)
+    print("[INICIO] CARGANDO DATOS DESDE POSTGRESQL Y CSV CACHE")
+    print("="*70)
 
-def safe_number(value, decimals=4):
-    """
-    Normaliza valores numericos evitando NaN o infinitos antes de serializar.
-    """
-    try:
-        if value is None:
-            return None
-        if isinstance(value, bool):
-            return float(value)
-        if not np.isfinite(value):
-            return None
-        return round(float(value), decimals)
-    except Exception:
-        return None
+    # Cargar datos de sensores desde PostgreSQL
+    print("\n[PASO 1] Cargando datos de sensores desde PostgreSQL...")
+    data_processor.load_real_data(start_date='2025-06-01', end_date='2025-07-30')
 
+    # Cargar datos de RMCAB desde CSV (no desde API)
+    print("\n[PASO 2] Cargando datos de RMCAB desde CSV cache...")
+    data_processor.load_rmcab_from_csv()
 
-def ensure_serializable(value):
-    """
-    Convierte estructuras con tipos de NumPy/Pandas a tipos compatibles con JSON.
-    """
-    if value is None or isinstance(value, (int, float, str, bool)):
-        return value
+    # Fusionar
+    print("\n[PASO 3] Fusionando datos de sensores y RMCAB...")
+    data_processor.merge_data()
 
-    if value is pd.NA:
-        return None
+    print("\n" + "="*70)
+    print("[OK] DATOS CARGADOS EXITOSAMENTE - LISTO PARA GRAFICAR")
+    print("="*70 + "\n")
 
-    if isinstance(value, np.generic):
-        return value.item()
+    return data_processor.merged_data
 
-    if isinstance(value, np.ndarray):
-        return ensure_serializable(value.tolist())
-
-    if isinstance(value, (pd.Series, pd.Index)):
-        return ensure_serializable(value.tolist())
-
-    if isinstance(value, (datetime, date)):
-        return value.isoformat()
-
-    if isinstance(value, pd.Timestamp):
-        return value.to_pydatetime().isoformat()
-
-    if isinstance(value, dict):
-        return {str(key): ensure_serializable(val) for key, val in value.items()}
-
-    if isinstance(value, (list, tuple, set)):
-        return [ensure_serializable(item) for item in value]
-
-    if isinstance(value, bytes):
-        return value.decode('utf-8', errors='ignore')
-
-    return value
-
-
-def normalize_device_list(devices):
-    if devices is None:
-        return None
-    if isinstance(devices, str):
-        devices = [devices]
-    elif isinstance(devices, set):
-        devices = list(devices)
-    elif not isinstance(devices, list):
-        return None
-    normalized = [str(device).strip() for device in devices if device]
-    return normalized or None
-
-
-def prepare_stage2_datasets(devices, station_code, start_date, end_date, window_start_ts, window_end_ts):
-    """
-    Carga y filtra los datos de sensores y RMCAB para la ventana solicitada.
-
-    Args:
-        devices (list[str]): Sensores a incluir.
-        station_code (int): Código de estación RMCAB.
-        start_date (str): Fecha inicial del rango solicitado.
-        end_date (str): Fecha final del rango solicitado.
-        window_start_ts (pd.Timestamp): Inicio de la ventana optimizada.
-        window_end_ts (pd.Timestamp): Fin de la ventana optimizada.
-
-    Returns:
-        tuple[pd.DataFrame, pd.DataFrame]: Datos de sensores y RMCAB alineados.
-    """
-    lowcost_data = load_lowcost_data(start_date, end_date, devices, aggregate=False, filter_by_keys=False)
-    if lowcost_data is None or lowcost_data.empty:
-        raise ValueError('No se encontraron datos de sensores para calibrar.')
-
-    lowcost_data = lowcost_data.copy()
-    lowcost_data['datetime'] = pd.to_datetime(lowcost_data['datetime']).dt.tz_localize(None)
-    lowcost_window = lowcost_data[
-        (lowcost_data['datetime'] >= window_start_ts) &
-        (lowcost_data['datetime'] <= window_end_ts)
-    ].copy()
-    if lowcost_window.empty:
-        raise ValueError('Los sensores no tienen datos dentro de la ventana indicada.')
-
-    rmcab_data = load_rmcab_data(station_code, start_date, end_date)
-    if rmcab_data is None or rmcab_data.empty:
-        raise ValueError('No fue posible cargar datos de la RMCAB para calibrar.')
-
-    rmcab_window = rmcab_data.copy()
-    rmcab_window['datetime'] = pd.to_datetime(rmcab_window['datetime']).dt.tz_localize(None)
-    rmcab_window = rmcab_window[
-        (rmcab_window['datetime'] >= window_start_ts) &
-        (rmcab_window['datetime'] <= window_end_ts)
-    ].copy()
-    if rmcab_window.empty:
-        raise ValueError('La RMCAB no contiene datos en la ventana seleccionada.')
-
-    reference_hours = set(rmcab_window['datetime'].dt.floor('H'))
-    if reference_hours:
-        lowcost_window['hour_key'] = lowcost_window['datetime'].dt.floor('H')
-        lowcost_window = lowcost_window[lowcost_window['hour_key'].isin(reference_hours)]
-        lowcost_window = lowcost_window.sort_values('datetime').drop_duplicates(subset=['device_name', 'hour_key'])
-        lowcost_window['datetime'] = lowcost_window['hour_key']
-        lowcost_window = lowcost_window.drop(columns=['hour_key'])
-
-    if lowcost_window.empty:
-        raise ValueError('No hay lecturas de sensores que coincidan con las horas de la RMCAB en la ventana seleccionada.')
-
-    return lowcost_window.sort_values('datetime'), rmcab_window.sort_values('datetime')
-
-# =======================
-# RUTAS PRINCIPALES
-# =======================
-
+# Rutas principales
 @app.route('/')
 def index():
-    """Página principal del proyecto"""
-    return render_template('index.html')
+    return render_template('index.html', title='Inicio')
+
+@app.route('/tecnologias')
+def tecnologias():
+    return render_template('tecnologias.html', title='Tecnologías')
 
 @app.route('/modelos')
 def modelos():
-    """Página de modelos de calibración y predicción"""
-    return render_template('modelos.html')
+    return render_template('modelos.html', title='Modelos')
 
 @app.route('/definiciones')
 def definiciones():
-    """Página de definiciones técnicas y conceptos"""
-    return render_template('definiciones.html')
+    return render_template('definiciones.html', title='Definiciones')
 
 @app.route('/acerca-de')
 def acerca_de():
-    """Página sobre el equipo y el proyecto"""
-    return render_template('acerca_de.html')
+    return render_template('acerca_de.html', title='Acerca de')
 
-@app.route('/visualizacion/junio-julio')
-def visualizacion_junio_julio():
-    """Página de visualización Junio-Julio 2025 (Sensores + Las Ferias)"""
-    return render_template('visualizacion_junio_julio.html')
+@app.route('/objetivo-1')
+def objetivo_1():
+    return render_template('objetivo1.html', title='Objetivo 1')
 
-@app.route('/visualizacion/2024')
-def visualizacion_2024():
-    """Página de visualización Periodo Completo 2024 (Sensores + Min Ambiente)"""
-    return render_template('visualizacion_2024.html')
+@app.route('/objetivo-2')
+def objetivo_2():
+    return render_template('objetivo2.html', title='Objetivo 2')
 
-# =======================
-# API ENDPOINTS
-# =======================
+@app.route('/objetivo-3')
+def objetivo_3():
+    return render_template('objetivo3.html', title='Objetivo 3')
 
-@app.route('/api/load-lowcost-data', methods=['POST'])
-def api_load_lowcost():
-    """Carga datos de sensores de bajo costo desde PostgreSQL"""
+# ==================== API ENDPOINTS ====================
+
+@app.route('/api/objetivo1/initialize', methods=['POST'])
+def api_initialize_objective1():
+    """Inicializa los datos para Objetivo 1"""
     try:
-        data = load_lowcost_data()
-        if data is None or data.empty:
-            return jsonify({
-                'success': False,
-                'error': 'No se encontraron datos',
-                'query': get_last_lowcost_query()
-            }), 404
+        global data_processor
+        df = initialize_data()
 
-        # Convertir a formato JSON
-        data_json = data.to_json(orient='records', date_format='iso')
         return jsonify({
-            'success': True,
-            'records': len(data),
-            'data': json.loads(data_json)
+            'status': 'success',
+            'message': 'Datos cargados correctamente',
+            'records': len(df),
+            'columns': list(df.columns)
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"[ERROR] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-@app.route('/api/stage2/load', methods=['POST'])
-def api_stage2_load():
-    """Identifica la ventana de mayor densidad y entrega datos completos/filtrados."""
+@app.route('/api/objetivo1/charts', methods=['GET'])
+def api_charts():
+    """Retorna DOS gráficos: PM2.5 y PM10 con datos REALES"""
     try:
-        payload = request.json or {}
-        start_date = payload.get('start_date', '2023-01-01')
-        end_date = payload.get('end_date', '2023-12-31')
-        devices = normalize_device_list(payload.get('devices'))
-        station_code = payload.get('station_code', 6)
-        window_days = payload.get('window_days', 5)
+        if data_processor is None or data_processor.merged_data is None:
+            initialize_data()
 
-        lowcost_data = load_lowcost_data(start_date, end_date, devices, aggregate=False, filter_by_keys=False)
-        if lowcost_data is None or lowcost_data.empty:
-            return jsonify({
-                'success': False,
-                'error': 'No se encontraron datos de sensores en el periodo indicado.',
-                'query': get_last_lowcost_query()
-            }), 404
+        df = data_processor.merged_data.copy()
 
-        window_info = find_dense_window(lowcost_data, window_days=window_days, devices=devices)
-        if not window_info:
-            return jsonify({'success': False, 'error': 'No fue posible identificar una ventana óptima de datos.'}), 400
+        # Crear columna de datetime redondeado para RMCAB (horas cerradas)
+        df['datetime_rmcab'] = df['datetime'].dt.round('H').astype(str)
 
-        window_df = window_info['subset'].copy().sort_values('datetime')
-        window_df['datetime'] = window_df['datetime'].dt.tz_localize(None)
+        # Convertir datetime a string para JSON
+        df['datetime'] = df['datetime'].astype(str)
 
-        full_lowcost_records = json.loads(
-            lowcost_data.sort_values('datetime').to_json(orient='records', date_format='iso')
-        )
+        # Construir datos PM2.5 (seleccionar solo columnas disponibles)
+        pm25_cols = ['datetime', 'datetime_rmcab', 'device_name', 'pm25']
+        if 'pm25_ref' in df.columns:
+            pm25_cols.append('pm25_ref')
+        if 'pm10_ref' in df.columns:
+            pm25_cols.append('pm10_ref')
 
-        rmcab_full = load_rmcab_data(station_code, start_date, end_date)
+        # Construir datos PM10 (seleccionar solo columnas disponibles)
+        pm10_cols = ['datetime', 'datetime_rmcab', 'device_name', 'pm10']
+        if 'pm10_ref' in df.columns:
+            pm10_cols.append('pm10_ref')
 
-        def prepare_rmcab(df):
-            if df is None or df.empty:
-                return pd.DataFrame()
-            prepared = df.copy()
-            prepared['datetime'] = pd.to_datetime(prepared['datetime']).dt.tz_localize(None)
-            if 'pm25_ref' in prepared.columns and 'pm25' not in prepared.columns:
-                prepared['pm25'] = prepared['pm25_ref']
-            if 'pm10_ref' in prepared.columns and 'pm10' not in prepared.columns:
-                prepared['pm10'] = prepared['pm10_ref']
-            return prepared.sort_values('datetime')
+        # Retornar DOS gráficos: PM2.5 y PM10
+        return jsonify({
+            'status': 'success',
+            'pm25': {
+                'title': 'PM2.5 (μg/m³) - Sensores vs RMCAB',
+                'data': json.loads(df[pm25_cols].to_json(orient='records'))
+            },
+            'pm10': {
+                'title': 'PM10 (μg/m³) - Sensores vs RMCAB',
+                'data': json.loads(df[pm10_cols].to_json(orient='records'))
+            }
+        })
+    except Exception as e:
+        print(f"[ERROR] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-        rmcab_prepared = prepare_rmcab(rmcab_full)
-        full_rmcab_records = json.loads(rmcab_prepared.to_json(orient='records', date_format='iso')) if not rmcab_prepared.empty else []
 
-        reference_hours = set()
-        rmcab_window_records = []
-        if not rmcab_prepared.empty:
-            mask = (
-                (rmcab_prepared['datetime'] >= window_info['start']) &
-                (rmcab_prepared['datetime'] <= window_info['end'])
-            )
-            rmcab_window = rmcab_prepared.loc[mask].copy()
-            reference_hours = set(rmcab_window['datetime'].dt.floor('H'))
-            rmcab_window_records = json.loads(rmcab_window.to_json(orient='records', date_format='iso'))
+@app.route('/api/objetivo1/raw-data', methods=['GET'])
+def api_raw_data():
+    """Retorna los datos CRUDOS tal como vienen de la BD y API"""
+    try:
+        if data_processor is None or data_processor.merged_data is None:
+            initialize_data()
 
-        if reference_hours:
-            window_df['hour_key'] = window_df['datetime'].dt.floor('H')
-            window_df = window_df[window_df['hour_key'].isin(reference_hours)]
-            window_df = window_df.sort_values('datetime').drop_duplicates(subset=['device_name', 'hour_key'])
-            window_df['datetime'] = window_df['hour_key']
-            window_df = window_df.drop(columns=['hour_key'])
-
-        window_records = json.loads(window_df.to_json(orient='records', date_format='iso'))
-
-        per_device_summary = []
-        per_device_counts = window_info.get('per_device_counts', {}) or {}
-        pollutant_counts_info = window_info.get('pollutant_counts', {}) or {}
-
-        if per_device_counts:
-            for device, count in sorted(per_device_counts.items(), key=lambda item: (-item[1], item[0])):
-                pollutant_counts = pollutant_counts_info.get(device, {'pm25': 0, 'pm10': 0})
-                per_device_summary.append({
-                    'device': device,
-                    'label': DEVICE_LABELS.get(device, device),
-                    'records': int(count),
-                    'pm25': int(pollutant_counts.get('pm25', 0)),
-                    'pm10': int(pollutant_counts.get('pm10', 0))
-                })
-        elif devices:
-            for device in devices:
-                per_device_summary.append({
-                    'device': device,
-                    'label': DEVICE_LABELS.get(device, device),
-                    'records': 0,
-                    'pm25': 0,
-                    'pm10': 0
-                })
-
-        reference_info = RMCAB_STATION_INFO.get(station_code, {})
+        df = data_processor.merged_data.copy()
+        df['datetime'] = df['datetime'].astype(str)
 
         return jsonify({
-            'success': True,
-            'window': {
-                'start': window_info['start'].isoformat(),
-                'end': window_info['end'].isoformat(),
-                'start_date': window_info['start'].date().isoformat(),
-                'end_date': window_info['end'].date().isoformat(),
-                'total_records': window_info['total_records'],
-                'hours_covered': window_info.get('hours_covered'),
-                'per_device': per_device_summary,
-                'station': {
-                    'code': station_code,
-                    'name': reference_info.get('name', f'RMCAB {station_code}')
-                }
-            },
-            'lowcost': window_records,
-            'rmcab': rmcab_window_records,
-            'full_lowcost': full_lowcost_records,
-            'full_rmcab': full_rmcab_records,
-            'query': get_last_lowcost_query()
+            'status': 'success',
+            'datos_reales': json.loads(df.to_json(orient='records')),
+            'total_registros': len(df),
+            'dispositivos': sorted(df['device_name'].unique().tolist()),
+            'columnas': list(df.columns)
         })
-    except Exception as exc:
-        return jsonify({'success': False, 'error': str(exc), 'query': get_last_lowcost_query()}), 500
+    except Exception as e:
+        print(f"[ERROR] Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/api/stage2/calibrate', methods=['POST'])
-def api_stage2_calibrate():
-    """Ejecuta la calibración optimizada para la ventana seleccionada."""
+
+@app.route('/api/objetivo1/calibration', methods=['POST'])
+def api_calibration():
+    """Ejecuta calibración INDEPENDIENTE por sensor para PM2.5 y PM10"""
     try:
-        payload = request.json or {}
-        devices = normalize_device_list(payload.get('devices'))
-        station_code = payload.get('station_code', 6)
-        start_date = payload.get('start_date', '2023-01-01')
-        end_date = payload.get('end_date', '2023-12-31')
-        window_start = payload.get('window_start')
-        window_end = payload.get('window_end')
-        pollutants = payload.get('pollutants') or ['pm25', 'pm10']
+        print("\n[API] Iniciando calibración INDEPENDIENTE por sensor...")
 
-        if not window_start or not window_end:
-            return jsonify({'success': False, 'error': 'Los campos window_start y window_end son obligatorios.'}), 400
+        if data_processor is None or data_processor.merged_data is None:
+            initialize_data()
 
-        window_start_ts = pd.Timestamp(window_start).tz_localize(None)
-        window_end_ts = pd.Timestamp(window_end).tz_localize(None)
+        df = data_processor.merged_data.copy()
 
-        try:
-            lowcost_window, rmcab_window = prepare_stage2_datasets(
-                devices,
-                station_code,
-                start_date,
-                end_date,
-                window_start_ts,
-                window_end_ts
-            )
-        except ValueError as exc:
-            return jsonify({
-                'success': False,
-                'error': str(exc),
-                'query': get_last_lowcost_query()
-            }), 404
+        # Ejecutar calibración INDEPENDIENTE por sensor
+        all_results = calibrator.calibrate_all_sensors_independent(df)
 
-        calibration_results = run_stage2_calibration(
-            lowcost_window,
-            rmcab_window,
-            devices=devices,
-            pollutants=pollutants
-        )
+        # Procesar resultados: Convertir estructura de {pollutant: {sensor: {range: results}}} a lo que JavaScript espera
+        calibration_summary = {}
 
-        response_payload = {
-            'success': True,
-            'window': {
-                'start': window_start_ts.isoformat(),
-                'end': window_end_ts.isoformat()
-            },
-            'devices': calibration_results
+        for pollutant in ['pm25', 'pm10']:
+            print(f"\n[API] Procesando resultados {pollutant.upper()}...")
+            sensors_data = all_results.get(pollutant, {})
+
+            # Reestructurar para que sea {range: {model: metrics}} globalmente
+            # Pero también guardar la información por sensor
+            global_results = {}
+
+            for sensor, sensor_ranges in sensors_data.items():
+                for range_name, range_results in sensor_ranges.items():
+                    if range_name not in global_results:
+                        global_results[range_name] = {}
+                    # Agregar resultados de este sensor para este rango
+                    global_results[range_name][f"{sensor}_{sensor}_"] = range_results
+
+            calibration_summary[pollutant] = {
+                'all_results': sensors_data,  # Guardar estructura original por sensor
+                'global_results': global_results,  # Para compatibilidad backwards
+                'by_sensor': sensors_data  # Explícitamente por sensor
+            }
+
+        print(f"[API] Calibración INDEPENDIENTE completada exitosamente")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Calibración completada',
+            'data': calibration_summary
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Error en calibración: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/objetivo1/calibration-by-range', methods=['POST'])
+def api_calibration_by_range():
+    """Ejecuta calibración para un pollutant y rango de tiempo específico"""
+    try:
+        req_data = request.get_json()
+        pollutant = req_data.get('pollutant', 'pm25')  # pm25 o pm10
+        time_range = req_data.get('time_range', 'completo')  # completo, 30dias, 15dias, 5dias, 3dias
+
+        print(f"\n[API] Calibración por rango: {pollutant.upper()} - {time_range}")
+
+        if data_processor is None or data_processor.merged_data is None:
+            initialize_data()
+
+        df = data_processor.merged_data.copy()
+
+        # Mapeo de rangos a días
+        time_ranges_map = {
+            'completo': None,
+            '30dias': 30,
+            '15dias': 15,
+            '5dias': 5,
+            '3dias': 3
         }
 
-        return jsonify(ensure_serializable(response_payload))
-    except Exception as exc:
-        app.logger.exception('Error ejecutando /api/stage2/calibrate')
-        return jsonify({'success': False, 'error': str(exc)}), 500
-
-
-@app.route('/api/stage2/download', methods=['POST'])
-def api_stage2_download():
-    """Genera un archivo Excel con los datos de la ventana seleccionada."""
-    try:
-        payload = request.json or {}
-        devices = normalize_device_list(payload.get('devices'))
-        station_code = payload.get('station_code', 6)
-        start_date = payload.get('start_date', '2023-01-01')
-        end_date = payload.get('end_date', '2023-12-31')
-        window_start = payload.get('window_start')
-        window_end = payload.get('window_end')
-
-        if not window_start or not window_end:
-            return jsonify({'success': False, 'error': 'Los campos window_start y window_end son obligatorios.'}), 400
-
-        window_start_ts = pd.Timestamp(window_start).tz_localize(None)
-        window_end_ts = pd.Timestamp(window_end).tz_localize(None)
-
-        try:
-            lowcost_window, rmcab_window = prepare_stage2_datasets(
-                devices,
-                station_code,
-                start_date,
-                end_date,
-                window_start_ts,
-                window_end_ts
-            )
-        except ValueError as exc:
-            return jsonify({
-                'success': False,
-                'error': str(exc),
-                'query': get_last_lowcost_query()
-            }), 400
-
-        device_list = devices
-        if not device_list:
-            if 'device_name' in lowcost_window.columns:
-                device_list = sorted(lowcost_window['device_name'].dropna().astype(str).unique().tolist())
-            else:
-                device_list = []
-
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            for device in device_list:
-                device_df = lowcost_window[lowcost_window['device_name'] == device].copy()
-                if device_df.empty:
-                    continue
-
-                columns = [
-                    col for col in ['datetime', 'device_name', 'pm25_sensor', 'pm10_sensor', 'temperature', 'rh']
-                    if col in device_df.columns
-                ]
-                export_df = device_df[columns].rename(columns={
-                    'datetime': 'timestamp',
-                    'device_name': 'device',
-                    'pm25_sensor': 'pm25_sensor_ugm3',
-                    'pm10_sensor': 'pm10_sensor_ugm3',
-                    'temperature': 'temperature_c',
-                    'rh': 'relative_humidity'
-                })
-                export_df.to_excel(writer, sheet_name=device[:31], index=False)
-
-            rmcab_columns = [
-                col for col in ['datetime', 'pm25', 'pm25_ref', 'pm10', 'pm10_ref']
-                if col in rmcab_window.columns
-            ]
-            if rmcab_columns:
-                rmcab_export = rmcab_window[rmcab_columns].rename(columns={
-                    'datetime': 'timestamp',
-                    'pm25': 'pm25_ref_ugm3',
-                    'pm25_ref': 'pm25_ref_ugm3',
-                    'pm10': 'pm10_ref_ugm3',
-                    'pm10_ref': 'pm10_ref_ugm3'
-                })
-                rmcab_export.to_excel(writer, sheet_name='RMCAB', index=False)
-
-        output.seek(0)
-        filename = f"datos_stage2_{window_start_ts.date()}_{window_end_ts.date()}.xlsx"
-        return send_file(
-            output,
-            as_attachment=True,
-            download_name=filename,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-    except Exception as exc:
-        app.logger.exception('Error generando Excel Stage 2')
-        return jsonify({'success': False, 'error': 'No fue posible generar el archivo Excel.'}), 500
-
-
-@app.route('/api/calibration-summary', methods=['POST'])
-def api_calibration_summary():
-    """Genera un resumen de calibración para todos los sensores solicitados"""
-    try:
-        payload = request.json or {}
-        start_date = payload.get('start_date', '2023-01-01')
-        end_date = payload.get('end_date', '2023-12-31')
-        devices = normalize_device_list(payload.get('devices'))
-        pollutants = payload.get('pollutants') or ['pm25', 'pm10']
-        station_code = payload.get('station_code', 6)
-
-        lowcost_data = load_lowcost_data(start_date, end_date, devices)
-        rmcab_data = load_rmcab_data(station_code, start_date, end_date)
-
-        if (
-            lowcost_data is None or rmcab_data is None or
-            lowcost_data.empty or rmcab_data.empty
-        ):
-            return jsonify({
-                'success': False,
-                'error': 'No se pudieron cargar los datos necesarios para la calibración'
-            }), 400
-
-        device_list = devices
-        if not device_list and lowcost_data is not None and not lowcost_data.empty and 'device_name' in lowcost_data.columns:
-            device_list = sorted(lowcost_data['device_name'].dropna().astype(str).unique().tolist())
-
-        sensor_summaries = []
-        for device in device_list or []:
-            device_data = lowcost_data[lowcost_data['device_name'] == device].copy()
-
-            if device_data.empty:
-                sensor_summaries.append({
-                    'device': device,
-                    'label': DEVICE_LABELS.get(device, device),
-                    'pollutant_results': [],
-                    'error': 'No hay datos disponibles para el periodo seleccionado'
-                })
-                continue
-
-            # Determinar período basado en las fechas
-            period = '2025' if '2025' in start_date else '2024'
-            calibration = run_device_calibration(device_data, rmcab_data, device, tuple(pollutants), period=period)
-            calibration['label'] = DEVICE_LABELS.get(device, device)
-            sensor_summaries.append(calibration)
-
-        reference_info = RMCAB_STATION_INFO.get(station_code, {})
-
-        return jsonify({
-            'success': True,
-            'period': {
-                'start_date': start_date,
-                'end_date': end_date
-            },
-            'reference': {
-                'station_code': station_code,
-                'station_name': reference_info.get('name', f'RMCAB {station_code}')
-            },
-            'sensors': sensor_summaries
-        })
-
-    except Exception as exc:
-        return jsonify({'success': False, 'error': str(exc)}), 500
-
-
-@app.route('/api/load-rmcab-data', methods=['POST'])
-def api_load_rmcab():
-    """Carga datos de RMCAB desde la API"""
-    try:
-        station_code = request.json.get('station_code', 6)  # Default: Las Ferias
-        data = load_rmcab_data(station_code)
-
-        if data is None or data.empty:
-            return jsonify({'error': 'No se encontraron datos'}), 404
-
-        data_json = data.to_json(orient='records', date_format='iso')
-        return jsonify({
-            'success': True,
-            'records': len(data),
-            'data': json.loads(data_json)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/calibrate', methods=['POST'])
-def api_calibrate():
-    """Ejecuta el proceso de calibración con múltiples modelos"""
-    try:
-        # Cargar datos
-        lowcost_data = load_lowcost_data()
-        rmcab_data = load_rmcab_data()
-
-        if lowcost_data is None or rmcab_data is None:
-            return jsonify({'error': 'No se pudieron cargar los datos'}), 404
+        days = time_ranges_map.get(time_range)
 
         # Ejecutar calibración
-        calibration = train_and_evaluate_models(lowcost_data, rmcab_data)
+        results = calibrator.calibrate_sensor_by_pollutant(df, pollutant=pollutant, time_range_days=days)
 
-        if calibration.get('error'):
-            return jsonify({'success': False, 'error': calibration['error']}), 400
-
-        return jsonify({
-            'success': True,
-            'records': calibration.get('records', 0),
-            'best_model': calibration.get('best_model'),
-            'results': calibration.get('results', [])
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/statistics', methods=['POST'])
-def api_statistics():
-    """Calcula estadísticas descriptivas de los datos"""
-    try:
-        data_type = request.json.get('data_type', 'lowcost')
-
-        if data_type == 'lowcost':
-            data = load_lowcost_data()
-        else:
-            data = load_rmcab_data()
-
-        if data is None or data.empty:
-            return jsonify({'error': 'No se encontraron datos'}), 404
-
-        stats = calculate_statistics(data)
-
-        return jsonify({
-            'success': True,
-            'statistics': stats
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/visualize', methods=['POST'])
-def api_visualize():
-    """Genera visualizaciones de datos"""
-    try:
-        plot_type = request.json.get('plot_type', 'timeseries')
-        data_type = request.json.get('data_type', 'lowcost')
-
-        # Cargar datos
-        if data_type == 'lowcost':
-            data = load_lowcost_data()
-        else:
-            data = load_rmcab_data()
-
-        if data is None or data.empty:
-            return jsonify({'error': 'No se encontraron datos'}), 404
-
-        # Generar visualización
-        if plot_type == 'timeseries':
-            fig = create_timeseries_plot(data)
-        elif plot_type == 'boxplot':
-            fig = create_boxplot(data)
-        elif plot_type == 'heatmap':
-            fig = create_heatmap(data)
-        else:
-            return jsonify({'error': 'Tipo de gráfico no válido'}), 400
-
-        # Convertir a JSON
-        fig_json = fig.to_json()
-
-        return jsonify({
-            'success': True,
-            'plot': json.loads(fig_json)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/load-device-data', methods=['POST'])
-def api_load_device_data():
-    """Carga datos de un dispositivo específico"""
-    try:
-        device_name = request.json.get('device_name')
-        start_date = request.json.get('start_date', '2024-06-01')
-        end_date = request.json.get('end_date', '2024-07-31')
-
-        data = load_lowcost_data(start_date, end_date, [device_name], aggregate=False, filter_by_keys=False)
-
-        if data is None or data.empty:
-            return jsonify({'error': f'No se encontraron datos para {device_name}'}), 404
-
-        data_json = data.to_json(orient='records', date_format='iso')
-        return jsonify({
-            'success': True,
-            'device': device_name,
-            'records': len(data),
-            'data': json.loads(data_json)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/calibrate-device', methods=['POST'])
-def api_calibrate_device():
-    """Ejecuta calibración para un dispositivo específico"""
-    try:
-        device_name = request.json.get('device_name')
-        start_date = request.json.get('start_date', '2024-06-01')
-        end_date = request.json.get('end_date', '2024-07-31')
-        pollutant = request.json.get('pollutant', 'pm25')
-
-        if not device_name:
-            return jsonify({'error': 'Debe proporcionar el nombre del dispositivo'}), 400
-
-        lowcost_data = load_lowcost_data(start_date, end_date, [device_name], aggregate=False, filter_by_keys=False)
-        rmcab_data = load_rmcab_data(6, start_date, end_date)  # Las Ferias
-
-        if (
-            lowcost_data is None or rmcab_data is None or
-            lowcost_data.empty or rmcab_data.empty
-        ):
-            return jsonify({'error': 'No se pudieron cargar los datos'}), 404
-
-        device_data = lowcost_data[lowcost_data['device_name'] == device_name].copy()
-        if device_data.empty:
-            return jsonify({'error': 'El dispositivo no tiene datos en el periodo indicado'}), 404
-
-        # Determinar período basado en las fechas
-        period = '2025' if '2025' in start_date else '2024'
-        calibration = run_device_calibration(device_data, rmcab_data, device_name, (pollutant,), period=period)
-        pollutant_results = calibration.get('pollutant_results', [])
-        pollutant_entry = pollutant_results[0] if pollutant_results else None
-
-        if not pollutant_entry or pollutant_entry.get('error'):
-            message = pollutant_entry.get('error') if pollutant_entry else 'No se obtuvieron resultados de calibración'
-            return jsonify({'error': message}), 400
-
-        return jsonify({
-            'success': True,
-            'device': device_name,
-            'pollutant': pollutant,
-            'records': pollutant_entry.get('records', 0),
-            'results': pollutant_entry.get('models', []),
-            'linear_regression': pollutant_entry.get('linear_regression'),
-            'scatter': pollutant_entry.get('scatter')
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/calibrate-multiple-devices', methods=['POST'])
-def api_calibrate_multiple_devices():
-    """Ejecuta calibración para múltiples dispositivos con múltiples contaminantes"""
-    try:
-        devices = normalize_device_list(request.json.get('devices'))
-        start_date = request.json.get('start_date', '2024-06-01')
-        end_date = request.json.get('end_date', '2024-07-31')
-        pollutants = request.json.get('pollutants', ['pm25'])  # Soportar múltiples contaminantes
-
-        print(f"\n{'='*60}")
-        print(f"CALIBRACIÓN MÚLTIPLE INICIADA")
-        print(f"{'='*60}")
-        print(f"Dispositivos: {devices}")
-        print(f"Periodo: {start_date} a {end_date}")
-        print(f"Contaminantes: {pollutants}")
-
-        # Cargar datos de todos los sensores
-        print(f"\n📊 Cargando datos de sensores...")
-        lowcost_data = load_lowcost_data(start_date, end_date, devices)
-        print(f"✅ Datos lowcost cargados: {len(lowcost_data) if lowcost_data is not None and not lowcost_data.empty else 0} registros")
-        
-        print(f"\n📊 Cargando datos de RMCAB...")
-        rmcab_data = load_rmcab_data(6, start_date, end_date)  # Las Ferias
-        print(f"✅ Datos RMCAB cargados: {len(rmcab_data) if rmcab_data is not None and not rmcab_data.empty else 0} registros")
-
-        if (
-            lowcost_data is None or rmcab_data is None or
-            lowcost_data.empty or rmcab_data.empty
-        ):
-            error_msg = 'No se pudieron cargar los datos'
-            print(f"❌ ERROR: {error_msg}")
-            return jsonify({'error': error_msg}), 404
-
-        # Calibrar cada dispositivo
-        results_by_device = {}
-        
-        for device_name in devices:
-            print(f"\n{'='*60}")
-            print(f"📡 Calibrando {device_name}...")
-            print(f"{'='*60}")
-            
-            device_data = lowcost_data[lowcost_data['device_name'] == device_name].copy()
-            
-            if device_data.empty:
-                error_msg = f'No hay datos para {device_name} en el periodo indicado'
-                print(f"⚠️  {error_msg}")
-                results_by_device[device_name] = {
-                    'success': False,
-                    'error': error_msg
-                }
-                continue
-
-            print(f"📊 Registros de {device_name}: {len(device_data)}")
-
-            try:
-                # Determinar período basado en las fechas
-                period = '2025' if '2025' in start_date else '2024'
-                calibration = run_device_calibration(device_data, rmcab_data, device_name, tuple(pollutants), period=period)
-                pollutant_results = calibration.get('pollutant_results', [])
-
-                if not pollutant_results or any(pr.get('error') for pr in pollutant_results):
-                    errors = [pr.get('error') for pr in pollutant_results if pr.get('error')]
-                    message = '; '.join(errors) if errors else 'No se obtuvieron resultados'
-                    print(f"❌ Error en calibración de {device_name}: {message}")
-                    results_by_device[device_name] = {
-                        'success': False,
-                        'error': message
-                    }
-                else:
-                    print(f"✅ {device_name} calibrado exitosamente")
-                    print(f"   - Contaminantes: {len(pollutant_results)}")
-                    for pr in pollutant_results:
-                        print(f"   - {pr.get('pollutant_label')}: {pr.get('records', 0)} registros, {len(pr.get('models', []))} modelos")
-                    
-                    results_by_device[device_name] = {
-                        'success': True,
-                        'device': device_name,
-                        'pollutant_results': pollutant_results
-                    }
-            except Exception as device_error:
-                error_msg = str(device_error)
-                print(f"❌ Excepción en {device_name}: {error_msg}")
-                import traceback
-                traceback.print_exc()
-                results_by_device[device_name] = {
-                    'success': False,
-                    'error': error_msg
-                }
-
-        # Verificar si al menos uno tuvo éxito
-        success_count = sum(1 for r in results_by_device.values() if r.get('success'))
-        
-        print(f"\n{'='*60}")
-        print(f"RESUMEN DE CALIBRACIÓN")
-        print(f"{'='*60}")
-        print(f"Exitosos: {success_count}/{len(devices)}")
-        for device, result in results_by_device.items():
-            status = "✅" if result.get('success') else "❌"
-            print(f"{status} {device}: {result.get('error', 'OK')}")
-        print(f"{'='*60}\n")
-        
-        return jsonify({
-            'success': success_count > 0,
-            'devices_calibrated': success_count,
-            'total_devices': len(devices),
-            'results_by_device': results_by_device
-        })
-    except Exception as e:
-        error_msg = str(e)
-        print(f"\n❌ ERROR GENERAL: {error_msg}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': error_msg}), 500
-
-@app.route('/api/predict-with-calibration', methods=['POST'])
-def api_predict_with_calibration():
-    """
-    Realiza predicción con modelo calibrado para una fecha específica y compara con RMCAB
-    Soporta dos modos:
-    - Modo 1: Con datos reales del sensor (automático)
-    - Modo 2: Con valores manuales ingresados por el usuario (cuando no hay datos)
-    """
-    import sys
-
-    try:
-        payload = request.json or {}
-        device_name = payload.get('device_name')
-        pollutant = payload.get('pollutant', 'pm25')
-        target_date = payload.get('target_date')  # Formato: YYYY-MM-DD
-        period = payload.get('period', '2025')
-        station_code = payload.get('station_code', 6)
-
-        # Valores manuales (opcionales)
-        manual_values = payload.get('manual_values')  # {'pm25_sensor': 15.5, 'temperature': 14.0, 'rh': 70.0}
-
-        print(f"\n{'='*60}", file=sys.stderr)
-        print(f"PREDICCIÓN CON MODELO CALIBRADO", file=sys.stderr)
-        print(f"{'='*60}", file=sys.stderr)
-        print(f"Dispositivo: {device_name}", file=sys.stderr)
-        print(f"Contaminante: {pollutant}", file=sys.stderr)
-        print(f"Fecha objetivo: {target_date}", file=sys.stderr)
-        print(f"Período: {period}", file=sys.stderr)
-        print(f"Modo: {'Manual' if manual_values else 'Datos Reales'}", file=sys.stderr)
-
-        # Validar parámetros
-        if not device_name or not target_date:
-            return jsonify({'error': 'Faltan parámetros requeridos (device_name, target_date)'}), 400
-
-        # Cargar modelo calibrado
-        print(f"\n📂 Cargando modelo calibrado...", file=sys.stderr)
-        model_info = load_calibration_model(device_name, pollutant, period)
-
-        if model_info is None:
+        if results is None:
             return jsonify({
-                'error': f'No se encontró modelo calibrado para {device_name} - {pollutant} ({period}). Ejecuta primero la calibración.'
-            }), 404
-
-        print(f"✅ Modelo cargado: {model_info.get('model_name')}", file=sys.stderr)
-        print(f"   Features: {model_info.get('feature_names')}", file=sys.stderr)
-
-        from datetime import datetime, timedelta
-        import numpy as np
-        target_dt = datetime.strptime(target_date, '%Y-%m-%d')
-
-        # Intentar cargar datos reales del sensor
-        sensor_start_date = target_dt.strftime('%Y-%m-%d')
-        sensor_end_date = (target_dt + timedelta(days=1)).strftime('%Y-%m-%d')
-        rmcab_start_date = (target_dt - timedelta(days=1)).strftime('%Y-%m-%d')
-        rmcab_end_date = (target_dt + timedelta(days=1)).strftime('%Y-%m-%d')
-
-        sensor_data = None
-        use_manual_mode = False
-
-        if manual_values:
-            # MODO MANUAL: Usuario proveyó valores
-            use_manual_mode = True
-            print(f"\n🔧 Usando valores manuales provisto por el usuario")
-        else:
-            # MODO AUTOMÁTICO: Intentar cargar datos reales
-            print(f"\n📊 Intentando cargar datos del sensor para {target_date}...")
-            try:
-                sensor_data = load_lowcost_data(sensor_start_date, sensor_end_date, [device_name])
-                if sensor_data is not None and not sensor_data.empty:
-                    sensor_data = sensor_data[sensor_data['datetime'].dt.date == target_dt.date()].copy()
-                    if sensor_data.empty:
-                        sensor_data = None
-            except Exception as e:
-                print(f"⚠️ No se pudieron cargar datos reales: {e}")
-                sensor_data = None
-
-            if sensor_data is None or sensor_data.empty:
-                print(f"⚠️ No hay datos reales disponibles")
-                # Sugerir usar modo manual
-                return jsonify({
-                    'error': f'No hay datos del sensor {device_name} para la fecha {target_date}',
-                    'suggestion': 'use_manual_mode',
-                    'message': 'No hay datos reales disponibles. Por favor ingresa valores manualmente.'
-                }), 404
-            else:
-                print(f"✅ Datos del sensor cargados: {len(sensor_data)} registros")
-                print(f"   Columnas en datos reales: {sensor_data.columns.tolist()}")
-
-        # Crear DataFrame con datos (reales o manuales)
-        if use_manual_mode:
-            # Crear 24 registros horarios con valores manuales
-            hours = pd.date_range(
-                start=f'{target_date} 00:00:00',
-                end=f'{target_date} 23:00:00',
-                freq='H'
-            )
-
-            sensor_data = pd.DataFrame({
-                'datetime': hours,
-                f'{pollutant}_sensor': [manual_values.get(f'{pollutant}_sensor', 15.0)] * 24,
-                'temperature': [manual_values.get('temperature', 14.0)] * 24,
-                'rh': [manual_values.get('rh', 70.0)] * 24
-            })
-
-            print(f"✅ Creados {len(sensor_data)} registros con valores manuales:")
-            print(f"   PM2.5: {manual_values.get(f'{pollutant}_sensor')} µg/m³")
-            print(f"   Temperatura: {manual_values.get('temperature')} °C")
-            print(f"   Humedad: {manual_values.get('rh')} %")
-
-        # Agregar variables temporales si no existen
-        if 'hour' not in sensor_data.columns:
-            sensor_data['hour'] = sensor_data['datetime'].dt.hour
-        if 'period_of_day' not in sensor_data.columns:
-            sensor_data['period_of_day'] = pd.cut(
-                sensor_data['hour'],
-                bins=[-0.1, 6, 12, 18, 24],
-                labels=[0, 1, 2, 3]
-            ).astype(int)
-        if 'day_of_week' not in sensor_data.columns:
-            sensor_data['day_of_week'] = sensor_data['datetime'].dt.dayofweek
-        if 'is_weekend' not in sensor_data.columns:
-            sensor_data['is_weekend'] = (sensor_data['day_of_week'] >= 5).astype(int)
-
-        # Verificar que tenemos todas las features necesarias
-        feature_names = model_info.get('feature_names', [])
-
-        print(f"\n🔍 Verificando features:")
-        print(f"   Features requeridas por el modelo: {feature_names}")
-        print(f"   Columnas disponibles en sensor_data: {sensor_data.columns.tolist()}")
-
-        missing_features = [f for f in feature_names if f not in sensor_data.columns]
-
-        if missing_features:
-            print(f"❌ Faltan features: {missing_features}")
-            print(f"   Datos de sensor_data (primeras 3 filas):")
-            print(sensor_data.head(3))
-            return jsonify({
-                'error': f'Faltan features en los datos del sensor: {missing_features}',
-                'required_features': feature_names,
-                'available_columns': sensor_data.columns.tolist(),
-                'suggestion': f'El modelo fue entrenado con {pollutant} pero faltan columnas necesarias'
+                'status': 'error',
+                'message': f'No hay datos suficientes para {pollutant} en rango {time_range}'
             }), 400
 
-        # Realizar predicción
-        print(f"\n🔮 Realizando predicción...")
-        predictions = predict_with_saved_model(model_info, sensor_data)
-
-        if predictions is None:
-            return jsonify({
-                'error': 'No se pudo realizar la predicción con el modelo'
-            }), 500
-
-        print(f"✅ Predicciones realizadas: {len(predictions)} valores")
-
-        # Agregar predicciones al DataFrame
-        sensor_data['predicted'] = predictions
-
-        # Cargar datos de RMCAB para comparación
-        print(f"\n📊 Cargando datos de RMCAB para comparación...")
-        rmcab_data = load_rmcab_data(station_code, rmcab_start_date, rmcab_end_date)
-
-        if rmcab_data is None or rmcab_data.empty:
-            print(f"⚠️ No hay datos de RMCAB para {target_date}")
-            rmcab_available = False
-        else:
-            # Filtrar solo el día específico
-            filtered_rmcab = rmcab_data[rmcab_data['datetime'].dt.date == target_dt.date()].copy()
-
-            if filtered_rmcab.empty:
-                shifted_rmcab = rmcab_data.copy()
-                shifted_rmcab['datetime'] = shifted_rmcab['datetime'] - pd.Timedelta(days=1)
-                filtered_rmcab = shifted_rmcab[shifted_rmcab['datetime'].dt.date == target_dt.date()].copy()
-                if not filtered_rmcab.empty:
-                    print("INFO: Ajustando RMCAB restando 1 día por desfase en la fuente")
-
-            rmcab_data = filtered_rmcab
-            rmcab_available = not rmcab_data.empty
-            if rmcab_available:
-                print(f"✅ Datos RMCAB cargados: {len(rmcab_data)} registros")
-
-        # Preparar resultados
-        results = []
-        for idx, row in sensor_data.iterrows():
-            result_entry = {
-                'datetime': row['datetime'].isoformat(),
-                'sensor_raw': safe_number(row.get(f'{pollutant}_sensor')),
-                'predicted': safe_number(row.get('predicted')),
-                'temperature': safe_number(row.get('temperature'), decimals=2) if 'temperature' in row else None,
-                'rh': safe_number(row.get('rh'), decimals=2) if 'rh' in row else None
-            }
-
-            # Buscar valor de RMCAB correspondiente
-            if rmcab_available:
-                # Buscar en RMCAB el registro más cercano (tolerancia de 1 hora)
-                time_diff = abs(rmcab_data['datetime'] - row['datetime'])
-                closest_idx = time_diff.idxmin()
-
-                if time_diff.loc[closest_idx] <= pd.Timedelta('1H'):
-                    rmcab_value = rmcab_data.loc[closest_idx, f'{pollutant}_ref']
-                    result_entry['rmcab_reference'] = safe_number(rmcab_value)
-
-                    # Calcular error
-                    predicted_value = row.get('predicted')
-                    if predicted_value is not None and np.isfinite(predicted_value) and np.isfinite(rmcab_value):
-                        error = predicted_value - rmcab_value
-                        abs_error = abs(error)
-                    else:
-                        abs_error = None
-                    result_entry['error'] = safe_number(abs_error)
-                    if rmcab_value > 0 and np.isfinite(rmcab_value) and abs_error is not None:
-                        result_entry['error_percentage'] = safe_number((abs_error / rmcab_value) * 100, decimals=2)
-                    else:
-                        result_entry['error_percentage'] = None
-                else:
-                    result_entry['rmcab_reference'] = None
-            else:
-                result_entry['rmcab_reference'] = None
-
-            results.append(result_entry)
-
-        # Calcular estadísticas de error si hay datos de RMCAB
-        error_stats = None
-        if rmcab_available:
-            valid_results = [
-                r for r in results
-                if r.get('rmcab_reference') is not None
-                and r.get('predicted') is not None
-                and r.get('sensor_raw') is not None
-            ]
-            if valid_results:
-                errors = [r['error'] for r in valid_results if r.get('error') is not None]
-                mean_error = np.mean(errors) if errors else None
-                max_error = np.max(errors) if errors else None
-                min_error = np.min(errors) if errors else None
-                predictions_vals = [r['predicted'] for r in valid_results]
-                rmcab_vals = [r['rmcab_reference'] for r in valid_results]
-
-                from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
-                import numpy as np
-
-                # Calcular también error del sensor sin calibrar
-                sensor_raw_vals = [r['sensor_raw'] for r in valid_results]
-                rmse_raw = np.sqrt(mean_squared_error(rmcab_vals, sensor_raw_vals))
-                mae_raw = mean_absolute_error(rmcab_vals, sensor_raw_vals)
-                r2_raw = r2_score(rmcab_vals, sensor_raw_vals)
-
-                rmse_calibrated = np.sqrt(mean_squared_error(rmcab_vals, predictions_vals))
-                mae_calibrated = mean_absolute_error(rmcab_vals, predictions_vals)
-                r2_calibrated = r2_score(rmcab_vals, predictions_vals)
-
-                rmse_improvement_pct = 0
-                if np.isfinite(rmse_raw) and rmse_raw > 0 and np.isfinite(rmse_calibrated):
-                    rmse_improvement_pct = safe_number((rmse_raw - rmse_calibrated) / rmse_raw * 100, decimals=2)
-
-                mae_improvement_pct = 0
-                if np.isfinite(mae_raw) and mae_raw > 0 and np.isfinite(mae_calibrated):
-                    mae_improvement_pct = safe_number((mae_raw - mae_calibrated) / mae_raw * 100, decimals=2)
-
-                error_stats = {
-                    'rmse': safe_number(rmse_calibrated),
-                    'mae': safe_number(mae_calibrated),
-                    'r2': safe_number(r2_calibrated),
-                    'mean_error': safe_number(mean_error),
-                    'max_error': safe_number(max_error),
-                    'min_error': safe_number(min_error),
-                    'comparisons_count': len(valid_results),
-                    # Métricas sin calibrar
-                    'rmse_raw': safe_number(rmse_raw),
-                    'mae_raw': safe_number(mae_raw),
-                    'r2_raw': safe_number(r2_raw),
-                    # Mejora porcentual
-                    'rmse_improvement_pct': rmse_improvement_pct,
-                    'mae_improvement_pct': mae_improvement_pct
-                }
-
-        # Calcular estadísticas descriptivas
-        descriptive_stats = {
-            'sensor_raw': {
-                'mean': safe_number(sensor_data[f'{pollutant}_sensor'].mean()),
-                'median': safe_number(sensor_data[f'{pollutant}_sensor'].median()),
-                'std': safe_number(sensor_data[f'{pollutant}_sensor'].std()),
-                'min': safe_number(sensor_data[f'{pollutant}_sensor'].min()),
-                'max': safe_number(sensor_data[f'{pollutant}_sensor'].max())
-            },
-            'predicted': {
-                'mean': safe_number(sensor_data['predicted'].mean()),
-                'median': safe_number(sensor_data['predicted'].median()),
-                'std': safe_number(sensor_data['predicted'].std()),
-                'min': safe_number(sensor_data['predicted'].min()),
-                'max': safe_number(sensor_data['predicted'].max())
-            }
-        }
-
-        if rmcab_available:
-            valid_rmcab_vals = [r['rmcab_reference'] for r in results if r.get('rmcab_reference') is not None]
-            if valid_rmcab_vals:
-                descriptive_stats['rmcab'] = {
-                    'mean': safe_number(np.mean(valid_rmcab_vals)),
-                    'median': safe_number(np.median(valid_rmcab_vals)),
-                    'std': safe_number(np.std(valid_rmcab_vals)),
-                    'min': safe_number(np.min(valid_rmcab_vals)),
-                    'max': safe_number(np.max(valid_rmcab_vals))
-                }
-
-        print(f"\n{'='*60}")
-        print(f"PREDICCIÓN COMPLETADA")
-        print(f"{'='*60}")
-        print(f"Registros predichos: {len(results)}")
-        if error_stats:
-            print(f"RMSE: {error_stats['rmse']}")
-            print(f"MAE: {error_stats['mae']}")
-            print(f"R²: {error_stats['r2']}")
-            print(f"Mejora RMSE: {error_stats.get('rmse_improvement_pct', 0)}%")
-            print(f"Mejora MAE: {error_stats.get('mae_improvement_pct', 0)}%")
-        print(f"{'='*60}\n")
+        # Obtener el mejor modelo para este rango
+        best_models = calibrator.get_best_model_for_range({time_range: results})
 
         return jsonify({
-            'success': True,
-            'device_name': device_name,
+            'status': 'success',
             'pollutant': pollutant,
-            'target_date': target_date,
-            'period': period,
-            'mode': 'manual' if use_manual_mode else 'real_data',
-            'model_info': {
-                'model_name': model_info.get('model_name'),
-                'metrics': model_info.get('metrics'),
-                'feature_names': feature_names
-            },
-            'predictions': results,
-            'error_stats': error_stats,
-            'descriptive_stats': descriptive_stats,
-            'rmcab_available': rmcab_available,
-            'records_count': len(results)
+            'time_range': time_range,
+            'all_models_results': results,
+            'best_model': best_models.get(time_range)
         })
 
     except Exception as e:
-        error_msg = str(e)
-        print(f"\n❌ ERROR EN PREDICCIÓN: {error_msg}")
+        print(f"[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': error_msg}), 500
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# =======================
-# MANEJO DE ERRORES
-# =======================
 
+# ==================== ENDPOINTS MODELO PREDICTIVO ====================
+
+@app.route('/api/objetivo2/train-improved', methods=['POST'])
+def api_train_improved():
+    """
+    ENTRENA MODELO HIBRIDO AVANZADO: REGRESSION + CLASSIFICATION
+    CON FEATURES METEOROLOGICAS MEJORADAS + FEATURES TEMPORALES
+
+    Solo se ejecuta UNA VEZ. Guarda el modelo entrenado.
+    Las siguientes ejecuciones cargan el modelo guardado (sin reentrenar).
+    """
+    try:
+        global advanced_model
+
+        print("\n" + "="*80)
+        print("[ENTRENAMIENTO AVANZADO] LightGBM Regression + Classification")
+        print("[HIBRIDO] Features Meteorológicas + Features Temporales + Features Derivadas")
+        print("="*80)
+
+        # Cargar datos RMCAB
+        print("\n[PASO 1/3] Cargando datos REALES de RMCAB (TODO EL AÑO 2025)...")
+        processor = DataProcessor()
+        rmcab_df = processor.load_rmcab_from_csv()
+
+        if rmcab_df is None or rmcab_df.empty:
+            raise ValueError("No se pudieron cargar datos de RMCAB")
+
+        total_records = len(rmcab_df)
+        date_min = rmcab_df['datetime'].min()
+        date_max = rmcab_df['datetime'].max()
+
+        print(f"   ✓ Registros: {total_records}")
+        print(f"   ✓ Período: {date_min} a {date_max}")
+
+        # Crear modelo avanzado híbrido
+        print("\n[PASO 2/3] Entrenando modelo LightGBM HIBRIDO (Regression + Classification)...")
+        print("   ✓ Generando features meteorológicas realistas (HR, Temp, Presión, Viento)")
+        print("   ✓ Agregando features derivadas (deltas, moving averages)")
+        print("   ✓ Agregando features temporales (hora, dia, mes, estación)")
+        print("   ✓ Entrenando 4 modelos LightGBM: PM2.5 Reg, PM2.5 Clf, PM10 Reg, PM10 Clf")
+
+        advanced_model = AdvancedPredictiveModel(lookback_window=24)
+
+        # Entrenar y guardar
+        model_info = advanced_model.train(
+            rmcab_df,
+            output_dir='static/results',
+            model_dir='models'
+        )
+
+        summary = advanced_model.get_summary()
+
+        # Mensaje final
+        print("\n[PASO 3/3] Generando gráficos avanzados de evaluación...")
+        print("\n" + "="*80)
+        print("[EXITO] Modelo HIBRIDO entrenado, guardado y evaluado")
+        print("="*80)
+        print("\nModelos guardados:")
+        print("  ✓ models/lightgbm_reg_pm25.pkl (Regression PM2.5)")
+        print("  ✓ models/lightgbm_reg_pm10.pkl (Regression PM10)")
+        print("  ✓ models/lightgbm_clf_pm25.pkl (Classification PM2.5)")
+        print("  ✓ models/lightgbm_clf_pm10.pkl (Classification PM10)")
+        print("\nGráficos generados:")
+        print("  ✓ static/results/advanced_evaluation_pm25.png (Regression + Classification + Residuos + Métricas)")
+        print("  ✓ static/results/advanced_evaluation_pm10.png (Regression + Classification + Residuos + Métricas)")
+        print(f"\nProximas ejecuciones: Cargarán los modelos guardados (sin reentrenar)")
+
+        print("\n[DEBUG] Summary being returned:")
+        import json
+        print(json.dumps(summary, indent=2, default=str))
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Modelo HIBRIDO entrenado, guardado y evaluado exitosamente',
+            'model_type': 'LightGBM Regression + Classification (HIBRIDO)',
+            'data_info': {
+                'total_records': total_records,
+                'period_start': str(date_min),
+                'period_end': str(date_max)
+            },
+            'results': summary,
+            'files_generated': [
+                'results/advanced_evaluation_pm25.png',
+                'results/advanced_evaluation_pm10.png'
+            ]
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Error en entrenamiento: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/objetivo2/load-model', methods=['GET'])
+def api_load_model():
+    """
+    CARGA EL MODELO HIBRIDO YA ENTRENADO (sin reentrenar)
+
+    Se ejecuta automaticamente cuando se accede a la página.
+    Si el modelo no existe, retorna instrucción de entrenar primero.
+    """
+    try:
+        global advanced_model
+
+        print("\n[CARGA DE MODELO] Buscando modelo HIBRIDO entrenado...")
+
+        advanced_model = AdvancedPredictiveModel()
+        model_loaded = advanced_model.load_trained_model(model_dir='models')
+
+        if model_loaded:
+            summary = advanced_model.get_summary()
+            print("\n[OK] Modelo HIBRIDO cargado exitosamente")
+
+            return jsonify({
+                'status': 'success',
+                'message': 'Modelo HIBRIDO cargado exitosamente (no se reentrenó)',
+                'model_info': advanced_model.model_info,
+                'results': summary
+            })
+        else:
+            print("\n[INFO] Modelo no encontrado - requiere entrenamiento previo")
+
+            return jsonify({
+                'status': 'not_trained',
+                'message': 'No hay modelo HIBRIDO entrenado. Ejecuta primero el entrenamiento.',
+                'action': 'Haz clic en "Entrenar Modelo" para entrenar una sola vez.'
+            }), 200
+
+    except Exception as e:
+        print(f"[ERROR] Error al cargar modelo: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/objetivo2/train-predictor', methods=['POST'])
+def api_train_predictor():
+    """ENDPOINT ANTIGUO - Mantiene compatibilidad"""
+    # Redirige al nuevo endpoint mejorado
+    return api_train_improved()
+
+
+@app.route('/api/objetivo2/metrics', methods=['GET'])
+def api_predictor_metrics():
+    """Retorna métricas del modelo predictivo"""
+    try:
+        if advanced_model is None:
+            return jsonify({
+                'status': 'error',
+                'message': 'Modelo no entrenado. Primero ejecuta /api/objetivo2/train-improved'
+            }), 400
+
+        summary = advanced_model.get_summary()
+
+        return jsonify({
+            'status': 'success',
+            'metrics': summary
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/objetivo2/validation-data', methods=['GET'])
+def api_validation_data():
+    """Retorna datos de validacion para tablas comparativas"""
+    try:
+        import random
+
+        # Leer datos de validacion
+        pm25_file = os.path.join('models', 'validation_pm2.5.json')
+        pm10_file = os.path.join('models', 'validation_pm10.json')
+
+        validation_result = {}
+
+        for pollutant, filepath in [('pm25', pm25_file), ('pm10', pm10_file)]:
+            if not os.path.exists(filepath):
+                continue
+
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+
+            real = data['real']
+            predicho = data['predicho']
+
+            # Calcular errores
+            errors = [abs(r - p) for r, p in zip(real, predicho)]
+
+            # OPCION A: 100 muestras aleatorias
+            indices = list(range(len(real)))
+            sample_indices = random.sample(indices, min(100, len(indices)))
+            opcion_a = [
+                {
+                    'idx': i,
+                    'real': round(real[i], 2),
+                    'predicho': round(predicho[i], 2),
+                    'error': round(errors[i], 2),
+                    'error_pct': round((errors[i] / (abs(real[i]) + 0.1) * 100), 2)
+                }
+                for i in sorted(sample_indices)
+            ]
+
+            # OPCION B: Primeras 50
+            opcion_b = [
+                {
+                    'idx': i,
+                    'real': round(real[i], 2),
+                    'predicho': round(predicho[i], 2),
+                    'error': round(errors[i], 2),
+                    'error_pct': round((errors[i] / (abs(real[i]) + 0.1) * 100), 2)
+                }
+                for i in range(min(50, len(real)))
+            ]
+
+            # OPCION C: Tabla resumen con percentiles
+            sorted_real = sorted(real)
+            sorted_pred = sorted(predicho)
+            sorted_errors = sorted(errors)
+
+            def percentile(data, p):
+                idx = int(len(data) * p / 100)
+                return round(data[min(idx, len(data)-1)], 2)
+
+            opcion_c = {
+                'real': {
+                    'min': round(min(real), 2),
+                    'q1': percentile(sorted_real, 25),
+                    'q2': percentile(sorted_real, 50),
+                    'q3': percentile(sorted_real, 75),
+                    'max': round(max(real), 2),
+                    'mean': round(sum(real) / len(real), 2)
+                },
+                'predicho': {
+                    'min': round(min(predicho), 2),
+                    'q1': percentile(sorted_pred, 25),
+                    'q2': percentile(sorted_pred, 50),
+                    'q3': percentile(sorted_pred, 75),
+                    'max': round(max(predicho), 2),
+                    'mean': round(sum(predicho) / len(predicho), 2)
+                },
+                'error': {
+                    'min': round(min(errors), 2),
+                    'q1': percentile(sorted_errors, 25),
+                    'q2': percentile(sorted_errors, 50),
+                    'q3': percentile(sorted_errors, 75),
+                    'max': round(max(errors), 2),
+                    'mean': round(sum(errors) / len(errors), 2)
+                }
+            }
+
+            validation_result[pollutant] = {
+                'opcion_a': opcion_a,
+                'opcion_b': opcion_b,
+                'opcion_c': opcion_c,
+                'total_samples': len(real)
+            }
+
+        return jsonify({
+            'status': 'success',
+            'validation': validation_result
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/results/<filename>', methods=['GET'])
+def download_result(filename):
+    """Descarga archivos de resultados"""
+    try:
+        import os
+        from flask import send_from_directory
+
+        # Validar nombre de archivo
+        allowed_files = ['predictive_metrics.csv', 'predictions_PM25.png',
+                         'predictions_PM10.png', 'steps_comparison.png']
+
+        if filename not in allowed_files:
+            return jsonify({'status': 'error', 'message': 'Archivo no permitido'}), 403
+
+        # Buscar archivo en static/results o results
+        if os.path.exists(f'static/results/{filename}'):
+            return send_from_directory('static/results', filename, as_attachment=True)
+        elif os.path.exists(f'results/{filename}'):
+            return send_from_directory('results', filename, as_attachment=True)
+        else:
+            return jsonify({'status': 'error', 'message': 'Archivo no encontrado'}), 404
+
+    except Exception as e:
+        print(f"[ERROR] Error al descargar: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# Manejadores de errores
 @app.errorhandler(404)
-def not_found(error):
+def page_not_found(e):
     return render_template('404.html'), 404
 
 @app.errorhandler(500)
-def internal_error(error):
+def internal_server_error(e):
     return render_template('500.html'), 500
 
-# =======================
-# INICIAR APLICACIÓN
-# =======================
-
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    debug = os.getenv('FLASK_ENV', 'development') == 'development'
-    # Desactivar reloader para evitar interrupciones durante calibración
-    app.run(host='0.0.0.0', port=port, debug=debug, use_reloader=False)
+    app.run(debug=True)
